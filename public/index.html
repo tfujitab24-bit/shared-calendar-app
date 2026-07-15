@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Shared Calendar</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1f5a52">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Calendar">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#20262b;
+    --paper:#f4f5f1;
+    --panel:#ffffff;
+    --line:#dfe1da;
+    --teal:#1f5a52;
+    --teal-soft:#e4efec;
+    --amber:#d98a3d;
+    --amber-soft:#faedd9;
+    --rose:#b8503f;
+    --rose-soft:#f6e2dd;
+    --muted:#767f78;
+    --tomo:#3b6fe0; --tomo-soft:#e3ebfd;
+    --veron:#d9469a; --veron-soft:#fbe1f0;
+    --toshi:#2f9e52; --toshi-soft:#e1f5e7;
+    --yuri:#7c4fd1; --yuri-soft:#ece3fa;
+    --lilly:#d9822b; --lilly-soft:#fbecd9;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(32,38,43,0.06), 0 4px 14px rgba(32,38,43,0.05);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Work Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-top:env(safe-area-inset-top);
+  }
+  h1,h2,h3{ font-family:'Fraunces', serif; font-weight:600; margin:0; }
+
+  /* Sync / notification banner */
+  .sync-banner{
+    position:fixed; top:calc(10px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%) translateY(-140%);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:999px;
+    font-size:13px; font-weight:600; box-shadow:0 10px 24px rgba(0,0,0,0.25);
+    z-index:100; opacity:0; transition:all .25s ease; white-space:nowrap; cursor:pointer;
+  }
+  .sync-banner.show{ transform:translateX(-50%) translateY(0); opacity:1; }
+
+  .bell{
+    position:relative; border:none; background:#f3f4f0; width:38px; height:38px;
+    border-radius:10px; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .bell .dot{
+    position:absolute; top:5px; right:6px; width:9px; height:9px; border-radius:50%;
+    background:var(--rose); border:2px solid var(--panel);
+  }
+  .bell .dot.hidden{ display:none; }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:22px 32px; border-bottom:1px solid var(--line);
+    background:var(--panel);
+    flex-wrap:wrap; gap:14px;
+  }
+  .topbar h1{ font-size:26px; letter-spacing:-0.01em; }
+  .whoami{ font-size:12px; color:var(--muted); cursor:pointer; margin-top:2px; }
+  .whoami:hover{ color:var(--teal); text-decoration:underline; }
+  .topbar-right{ display:flex; align-items:center; gap:12px; }
+
+  .month-nav{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 18px; border-bottom:1px solid var(--line);
+  }
+  .month-nav h2{ font-size:18px; letter-spacing:-0.01em; cursor:pointer; padding:4px 8px; border-radius:8px; transition:background .12s ease; }
+  .month-nav h2:hover{ background:#f3f4f0; }
+  .month-nav button{
+    border:none; background:#f3f4f0; color:var(--teal); width:34px; height:34px;
+    border-radius:8px; font-size:14px; cursor:pointer; transition:all .12s ease;
+  }
+  .month-nav button:hover:not(:disabled){ background:#e7e9e2; }
+  .month-nav button:disabled{ opacity:0.3; cursor:default; }
+
+  .view-tabs{
+    display:flex; align-items:center; gap:6px;
+    background:#eef0eb; padding:6px; border-radius:999px;
+  }
+  .view-tabs button{
+    border:none; background:transparent; padding:8px 18px; border-radius:999px;
+    font-family:'Work Sans'; font-weight:600; font-size:14px; cursor:pointer;
+    transition:all .15s ease; color:var(--muted);
+  }
+  #tabTomo{ color:var(--tomo); }
+  #tabVeron{ color:var(--veron); }
+  #tabAll{ color:var(--ink); }
+  #tabTomo.active{ background:var(--tomo); color:#fff; }
+  #tabVeron.active{ background:var(--veron); color:#fff; }
+  #tabAll.active{ background:linear-gradient(90deg, var(--tomo), var(--veron), var(--toshi), var(--yuri), var(--lilly)); color:#fff; }
+
+  .today-card-wrap{ padding:20px 32px 0; }
+  .today-card-wrap .card{ padding:16px 16px 18px; border-color:var(--rose); border-width:1.5px; }
+  .today-card-wrap h3{ font-size:15px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+  .today-card-wrap h3 .dot{ width:8px; height:8px; border-radius:50%; }
+
+  .layout{
+    display:grid; grid-template-columns:1fr 320px; gap:24px;
+    padding:24px 32px 48px; align-items:start;
+  }
+  @media (max-width:900px){ .layout{ grid-template-columns:1fr; } }
+
+  .col-main{ display:flex; flex-direction:column; gap:24px; min-width:0; }
+  .lists-row{ display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  .list-card{ padding:16px 16px 18px; }
+  @media (max-width:700px){ .lists-row{ grid-template-columns:1fr; } }
+
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+
+  /* Calendar grid */
+  .cal-head{ display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid var(--line); }
+  .cal-head div{
+    padding:10px 8px; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; text-align:center;
+  }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); grid-auto-rows:132px; }
+  .day-cell{
+    border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+    padding:6px; position:relative; overflow:hidden; cursor:pointer;
+    transition:background .12s ease;
+  }
+  .day-cell:hover{ background:#fbfbf9; }
+  .day-cell:nth-child(7n){ border-right:none; }
+  .day-cell.empty{ background:#fafaf8; cursor:default; }
+  .day-num{ font-size:13px; font-weight:600; color:var(--ink); margin-bottom:4px; }
+  .day-cell.today .day-num{
+    background:var(--teal); color:#fff; width:22px; height:22px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .evt{
+    font-size:11px; line-height:1.3; padding:3px 6px; border-radius:6px; margin-bottom:3px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    border-left:3px solid var(--line);
+    background:#f2f3ef; color:var(--ink);
+  }
+  .evt.person-tomo{ background:var(--tomo-soft); border-left-color:var(--tomo); color:#1d3f8f; }
+  .evt.person-veron{ background:var(--veron-soft); border-left-color:var(--veron); color:#8a1f5c; }
+  .evt.person-toshi{ background:var(--toshi-soft); border-left-color:var(--toshi); color:#1c5c33; }
+  .evt.person-yuri{ background:var(--yuri-soft); border-left-color:var(--yuri); color:#4a2c8f; }
+  .evt.person-lilly{ background:var(--lilly-soft); border-left-color:var(--lilly); color:#8a4f16; }
+  .evt.pending{ border-left-style:dashed; }
+  .evt.pending::before{ content:'⏳ '; }
+  .evt-more{ font-size:10px; color:var(--muted); padding-left:6px; }
+
+  .add-hint{
+    position:absolute; top:6px; right:6px; opacity:0; font-size:16px; color:var(--teal);
+    transition:opacity .12s ease;
+  }
+  .day-cell:hover .add-hint{ opacity:0.6; }
+
+  /* Sidebar */
+  .side{ display:flex; flex-direction:column; gap:18px; }
+  .side .card{ padding:16px 16px 18px; }
+  .side h3{ font-size:15px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+  .side h3 .dot{ width:8px; height:8px; border-radius:50%; }
+
+  .pending-item{
+    background:var(--amber-soft); border-radius:8px; padding:9px 10px; margin-bottom:8px; font-size:13px;
+  }
+  .pending-item .meta{ font-size:11px; color:#8a5b20; margin-bottom:6px; }
+  .pending-item .btnrow{ display:flex; gap:6px; margin-top:7px; }
+  .pending-item button{
+    border:none; border-radius:6px; padding:5px 10px; font-size:12px; font-weight:600; cursor:pointer;
+  }
+  .btn-allow{ background:var(--teal); color:#fff; }
+  .btn-decline{ background:transparent; color:var(--rose); border:1px solid var(--rose)!important; }
+  .empty-note{ font-size:12.5px; color:var(--muted); font-style:italic; }
+
+  .note-item{
+    display:flex; align-items:center; gap:9px;
+    padding:8px 2px; font-size:13px; cursor:pointer;
+    border-bottom:1px solid var(--line);
+  }
+  .note-item:last-child{ border-bottom:none; }
+  .note-item input[type="checkbox"]{ width:16px; height:16px; cursor:pointer; flex-shrink:0; accent-color:var(--teal); }
+  .note-item span{ flex:1; }
+  .note-item .item-delete{
+    background:none; border:none; color:var(--muted); cursor:pointer; font-size:13px;
+    padding:2px 6px; border-radius:6px; flex-shrink:0;
+  }
+  .note-item .item-delete:hover{ color:var(--rose); background:var(--rose-soft); }
+
+  .today-item.evt{
+    position:static; display:flex; align-items:center; gap:8px;
+    white-space:normal; padding:9px 10px; font-size:13px; margin-bottom:6px; cursor:pointer;
+  }
+  .today-item .ti-time{ font-size:11px; color:var(--muted); font-weight:700; white-space:nowrap; }
+  .today-item .ti-title{ font-weight:600; }
+
+  .sugg-item{
+    background:#f6f7f4; border:1px solid var(--line); border-radius:8px; padding:9px 10px; margin-bottom:8px; font-size:13px;
+  }
+  .sugg-item .meta{ font-size:11px; color:var(--muted); margin-bottom:6px; }
+  .sugg-item .btnrow{ display:flex; gap:6px; margin-top:7px; }
+  .btn-use{ background:var(--teal); color:#fff; }
+  .btn-dismiss{ background:transparent; color:var(--muted); border:1px solid var(--line)!important; }
+
+  .sugg-input, .note-inline{
+    display:flex; gap:6px; margin-top:8px;
+  }
+  .sugg-input input{
+    flex:1; border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-size:13px; font-family:'Work Sans';
+  }
+  .sugg-input button{
+    background:var(--teal); color:#fff; border:none; border-radius:6px; padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(32,38,43,0.35); display:none;
+    align-items:center; justify-content:center; z-index:50;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    background:#fff; border-radius:12px; width:340px; padding:22px; box-shadow:0 20px 50px rgba(0,0,0,0.25);
+  }
+  .modal h3{ margin-bottom:14px; }
+  .modal label{ font-size:12px; font-weight:600; color:var(--muted); display:block; margin:10px 0 4px; }
+  .modal input, .modal select{
+    width:100%; border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:13.5px; font-family:'Work Sans';
+  }
+  .modal .row{ display:flex; gap:8px; }
+  .modal .row > div{ flex:1; }
+  .modal-actions{ display:flex; justify-content:space-between; margin-top:18px; align-items:center; }
+  .modal-actions .save{ background:var(--teal); color:#fff; border:none; border-radius:7px; padding:9px 16px; font-weight:600; cursor:pointer; font-size:13.5px; }
+  .modal-actions .cancel{ background:transparent; border:none; color:var(--muted); cursor:pointer; font-size:13px; }
+  .modal-actions .delete{ background:transparent; border:none; color:var(--rose); cursor:pointer; font-size:13px; }
+  .modal-hint{ font-size:11.5px; color:var(--muted); margin-top:12px; line-height:1.4; }
+
+  .conn-status{ font-size:10.5px; color:var(--muted); padding:2px 32px 0; }
+  .conn-status.offline{ color:var(--rose); }
+
+  .shop-completed-toggle{
+    font-size:12px; color:var(--muted); cursor:pointer; margin-top:8px;
+    padding:8px 4px 2px; border-top:1px solid var(--line); text-align:center; font-weight:600;
+    user-select:none;
+  }
+  .shop-completed-toggle:hover{ color:var(--teal); }
+  .shop-completed-list{ margin-top:4px; }
+  .shop-completed-list.hidden{ display:none; }
+  .note-item.done span{ text-decoration:line-through; color:var(--muted); }
+
+  .hidden{ display:none; }
+
+  /* ---- Month/Week view toggle ---- */
+  .view-toggle{
+    display:flex; gap:4px; background:#eef0eb; padding:4px; border-radius:10px;
+    margin:14px 18px 0; width:fit-content;
+  }
+  .view-toggle button{
+    border:none; background:transparent; padding:7px 16px; border-radius:8px;
+    font-family:'Work Sans'; font-weight:600; font-size:13px; cursor:pointer; color:var(--muted);
+    transition:all .12s ease;
+  }
+  .view-toggle button.active{ background:var(--panel); color:var(--teal); box-shadow:var(--shadow); }
+
+  /* ---- Week view ---- */
+  .week-nav{ display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); }
+  .week-nav button{
+    border:none; background:#f3f4f0; color:var(--teal); padding:8px 14px; border-radius:8px;
+    font-size:13px; font-weight:600; cursor:pointer; font-family:'Work Sans';
+  }
+  .week-nav button:hover{ background:#e7e9e2; }
+  .week-nav .range{ font-weight:600; font-size:15px; margin-left:auto; color:var(--ink); padding:4px 8px; border-radius:8px; transition:background .12s ease; }
+  .week-nav .range:hover{ background:#f3f4f0; }
+  .week-head{ display:grid; grid-template-columns:52px repeat(7,1fr); border-bottom:1px solid var(--line); }
+  .week-head .wd{
+    padding:8px 4px; text-align:center; font-size:11px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--muted); font-weight:600; border-left:1px solid var(--line);
+  }
+  .week-head .wnum{ font-size:15px; font-weight:700; color:var(--ink); margin-top:2px; }
+  .week-head .wd.today .wnum{
+    background:var(--teal); color:#fff; border-radius:50%; width:24px; height:24px;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .week-body-scroll{ max-height:60vh; overflow-y:auto; }
+  .week-body{ display:grid; grid-template-columns:52px repeat(7,1fr); }
+  .week-time-col{ display:grid; }
+  .week-time-label{
+    height:48px; font-size:10.5px; color:var(--muted); text-align:right;
+    padding-right:6px; transform:translateY(-7px);
+  }
+  .week-day-col{
+    position:relative; border-left:1px solid var(--line); cursor:pointer;
+    background-image:repeating-linear-gradient(to bottom, transparent 0, transparent 47px, var(--line) 47px, var(--line) 48px);
+  }
+  .week-day-col.today{ background-color:var(--teal-soft); }
+  .week-evt{
+    position:absolute; left:2px; right:2px; border-radius:7px; padding:4px 6px; font-size:11px;
+    overflow:hidden; cursor:pointer; border:1.5px solid transparent; box-shadow:0 1px 3px rgba(0,0,0,0.08);
+  }
+  .week-evt.person-tomo{ background:var(--tomo-soft); border-color:var(--tomo); color:#1d3f8f; }
+  .week-evt.person-veron{ background:var(--veron-soft); border-color:var(--veron); color:#8a1f5c; }
+  .week-evt.person-toshi{ background:var(--toshi-soft); border-color:var(--toshi); color:#1c5c33; }
+  .week-evt.person-yuri{ background:var(--yuri-soft); border-color:var(--yuri); color:#4a2c8f; }
+  .week-evt.person-lilly{ background:var(--lilly-soft); border-color:var(--lilly); color:#8a4f16; }
+  .week-evt.pending{ border-style:dashed; }
+  .week-evt .we-title{ font-weight:700; line-height:1.15; }
+  .week-evt .we-time{ font-size:10px; opacity:.85; }
+
+  /* ---- Mobile (iPhone) layout ---- */
+  html, body{ overflow-x:hidden; }
+  @media (max-width:480px){
+    .topbar{ padding:12px 14px; gap:8px; }
+    .topbar h1{ font-size:19px; }
+    .topbar-right{ flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+    .view-tabs{ padding:4px; }
+    .view-tabs button{ padding:6px 10px; font-size:12px; }
+    .bell{ width:32px; height:32px; font-size:14px; }
+    #enableNotifBtn{ font-size:11px!important; padding:0 8px!important; height:32px!important; white-space:normal!important; line-height:1.15!important; }
+
+    .today-card-wrap{ padding:10px 8px 0; }
+    .layout{ padding:10px 8px 32px; gap:16px; }
+    .lists-row{ gap:12px; }
+
+    .month-nav{ padding:10px 8px; }
+    .month-nav h2{ font-size:15px; }
+
+    .cal-head div{ padding:6px 1px; font-size:9px; }
+    .cal-grid{ grid-auto-rows:minmax(78px, auto); }
+    .day-cell{ padding:3px; }
+    .day-num{ font-size:11px; margin-bottom:2px; }
+    .evt{
+      font-size:9.5px; line-height:1.25; padding:2px 4px; margin-bottom:2px;
+      white-space:normal; word-break:break-word; overflow-wrap:break-word; overflow:visible; text-overflow:clip;
+    }
+    .evt-more{ font-size:9px; }
+
+    .week-head{ grid-template-columns:30px repeat(7,1fr); }
+    .week-head .wd{ padding:6px 1px; font-size:9px; }
+    .week-head .wnum{ font-size:12px; }
+    .week-body{ grid-template-columns:30px repeat(7,1fr); }
+    .week-time-label{ font-size:8.5px; padding-right:3px; }
+    .week-evt{ font-size:9px; padding:2px 3px; overflow:visible; }
+    .week-evt .we-title{ white-space:normal; word-break:break-word; line-height:1.1; }
+    .week-evt .we-time{ font-size:8.5px; }
+
+    .sync-banner{
+      max-width:92vw; white-space:normal; text-align:center; font-size:11.5px;
+      padding:8px 14px; line-height:1.3;
+    }
+
+    .modal{ width:92vw; padding:16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sync-banner" id="syncBanner" onclick="ackChanges()"></div>
+
+<div class="topbar">
+  <div>
+    <h1>Shared Calendar</h1>
+    <div class="whoami" id="whoamiLabel" onclick="openIdentitySwitcher()"></div>
+  </div>
+  <div class="topbar-right">
+    <div class="view-tabs">
+      <button id="tabTomo" onclick="setTab('tomo')">Tomo</button>
+      <button id="tabVeron" onclick="setTab('veron')">Veron</button>
+      <button id="tabAll" class="active" onclick="setTab('all')">Everyone</button>
+    </div>
+    <button class="bell" onclick="ackChanges()" aria-label="Notifications">
+      🔔<span class="dot hidden" id="notifyDot"></span>
+    </button>
+    <button id="enableNotifBtn" onclick="enablePushNotifications()" style="border:none;background:#f3f4f0;color:var(--teal);padding:0 12px;height:38px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Enable Notifications</button>
+  </div>
+</div>
+<div class="conn-status" id="connStatus"></div>
+
+<div class="today-card-wrap">
+  <div class="card">
+    <h3><span class="dot" style="background:var(--rose)"></span>Today's Schedule</h3>
+    <div id="todayList"></div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <div class="col-main">
+    <div class="card">
+      <div class="view-toggle">
+        <button id="toggleWeekBtn" onclick="setMainView('week')">🗓 Week</button>
+        <button id="toggleMonthBtn" onclick="setMainView('month')">📅 Month</button>
+      </div>
+
+      <div id="monthViewCard">
+        <div class="month-nav">
+          <button id="prevMonthBtn" onclick="prevMonth()" aria-label="Previous month">◀</button>
+          <h2 id="monthLabel" onclick="openMonthPicker()" title="Jump to a month">July 2026</h2>
+          <button id="nextMonthBtn" onclick="nextMonth()" aria-label="Next month">▶</button>
+        </div>
+        <div class="cal-head">
+          <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+
+      <div id="weekViewCard" class="hidden">
+        <div class="week-nav">
+          <button onclick="prevWeek()" aria-label="Previous week">◀</button>
+          <button onclick="todayWeek()">Today</button>
+          <button onclick="nextWeek()" aria-label="Next week">▶</button>
+          <span class="range" id="weekRangeLabel" onclick="openMonthPicker()" title="Jump to a month" style="cursor:pointer;"></span>
+        </div>
+        <div class="week-head" id="weekHead"></div>
+        <div class="week-body-scroll">
+          <div class="week-body">
+            <div class="week-time-col" id="weekTimeCol"></div>
+            <div id="weekDayCols" style="display:contents;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lists-row">
+      <div class="card list-card">
+        <h3><span class="dot" style="background:var(--yuri)"></span>Wishlist</h3>
+        <div id="wishlistList"></div>
+        <div class="sugg-input">
+          <input id="wishlistInput" type="text" placeholder="Add an item, e.g. 'Tennis racket'">
+          <button onclick="addShoppingItem('wishlist')">Add</button>
+        </div>
+        <div class="shop-completed-toggle" onclick="toggleCompletedShopping('wishlist')">
+          <span id="wishlistToggleArrow">▾</span> Completed (<span id="wishlistCompletedCount">0</span>)
+        </div>
+        <div id="wishlistCompletedList" class="shop-completed-list hidden"></div>
+      </div>
+
+      <div class="card list-card">
+        <h3><span class="dot" style="background:var(--toshi)"></span>Grocery</h3>
+        <div id="groceryList"></div>
+        <div class="sugg-input">
+          <input id="groceryInput" type="text" placeholder="Add an item, e.g. 'Milk'">
+          <button onclick="addShoppingItem('grocery')">Add</button>
+        </div>
+        <div class="shop-completed-toggle" onclick="toggleCompletedShopping('grocery')">
+          <span id="groceryToggleArrow">▾</span> Completed (<span id="groceryCompletedCount">0</span>)
+        </div>
+        <div id="groceryCompletedList" class="shop-completed-list hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side">
+
+    <div class="card">
+      <h3><span class="dot" style="background:var(--amber)"></span>Pending approval</h3>
+      <div id="pendingList"></div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot" style="background:var(--teal)"></span>Notes</h3>
+      <div id="notesList"></div>
+      <div class="sugg-input">
+        <input id="noteInput" type="text" placeholder="Add a note...">
+        <button onclick="addNote()">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot" style="background:#8a8f7f"></span>Suggestions</h3>
+      <div id="suggList"></div>
+      <div class="sugg-input">
+        <input id="suggInput" type="text" placeholder="Suggest an idea, e.g. 'Beach trip w/ Aunt Nica?'">
+        <button onclick="addSuggestion()">Add</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- First-run identity picker -->
+<div class="overlay" id="whoOverlay" style="display:none;">
+  <div class="modal" style="text-align:center;">
+    <h3>Who's using this device?</h3>
+    <p style="color:var(--muted);font-size:13px;margin:10px 0 16px;line-height:1.4;">This sets who you're signed in as on this phone — you can still switch anytime with the tabs above.</p>
+    <div style="display:flex;gap:10px;">
+      <button onclick="pickIdentity('A')" style="flex:1;padding:14px;border:none;border-radius:10px;background:var(--tomo);color:#fff;font-weight:700;font-size:15px;cursor:pointer;">Tomo</button>
+      <button onclick="pickIdentity('B')" style="flex:1;padding:14px;border:none;border-radius:10px;background:var(--veron);color:#fff;font-weight:700;font-size:15px;cursor:pointer;">Veron</button>
+    </div>
+  </div>
+</div>
+
+<!-- Month picker modal -->
+<div class="overlay" id="monthPickerOverlay">
+  <div class="modal" style="width:280px;">
+    <h3>Jump to month</h3>
+    <label>Month</label>
+    <select id="pickMonthSelect"></select>
+    <label>Year</label>
+    <select id="pickYearSelect" onchange="populateMonthPickerOptions()"></select>
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeMonthPicker()">Cancel</button>
+      <button class="save" onclick="applyMonthPick()">Go</button>
+    </div>
+  </div>
+</div>
+
+<!-- Day detail modal -->
+<div class="overlay" id="dayOverlay">
+  <div class="modal">
+    <h3 id="dayModalTitle">July 1, 2026</h3>
+    <div id="dayEventsList" style="max-height:280px;overflow-y:auto;margin:12px 0;"></div>
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeDayModal()">Close</button>
+      <button class="save" onclick="addFromDayModal()">+ Add Event</button>
+    </div>
+  </div>
+</div>
+
+<!-- Event modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="modalTitle">Add event</h3>
+    <label>Title</label>
+    <input id="evtTitle" type="text" placeholder="e.g. Tennis with coach" oninput="refreshApprovalHint()">
+    <div class="row">
+      <div>
+        <label>Start time</label>
+        <input id="evtStart" type="time">
+      </div>
+      <div>
+        <label>End time</label>
+        <input id="evtEnd" type="time">
+      </div>
+    </div>
+    <div class="modal-hint" id="modalDayLabel"></div>
+    <div class="modal-actions">
+      <div>
+        <button class="cancel" onclick="closeModal()">Cancel</button>
+        <button class="delete" id="deleteBtn" onclick="deleteEvent()" style="display:none;">Delete</button>
+      </div>
+      <button class="save" onclick="saveEvent()">Save</button>
+    </div>
+    <div class="modal-hint" id="approvalHint"></div>
+  </div>
+</div>
+
+<!-- ================= Firebase (fill in your project's config) ================= -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  // PASTE your Firebase project config here (Firebase Console -> Project settings -> General -> Your apps -> SDK setup and configuration).
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLbJIxFtqlxQdKj1JM0RTUfuEQcn2av0k",
+    authDomain: "fujita-s-calendar.firebaseapp.com",
+    projectId: "fujita-s-calendar",
+    storageBucket: "fujita-s-calendar.firebasestorage.app",
+    messagingSenderId: "784515875449",
+    appId: "1:784515875449:web:2ef90d9fe8bb87a7514aa8"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const stateDocRef = db.collection('households').doc('tomo-veron-family');
+</script>
+
+<script>
+/* ---------- State ---------- */
+let currentUser = localStorage.getItem('scal_myIdentity') || 'A'; // 'A' or 'B' — who is "acting" for approval purposes
+let activeTab = localStorage.getItem('scal_activeTab') || 'all'; // 'tomo' | 'veron' | 'all' — which calendar view is showing
+const userNames = { A: "Tomo", B: "Veron" };
+
+// Calendar spans the whole remaining stretch of 2026 through the end of 2027.
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MIN_YEAR = 2026, MIN_MONTH = 6;  // July 2026
+const MAX_YEAR = 2027, MAX_MONTH = 11; // December 2027
+let viewedYear = 2026, viewedMonth = 6; // currently displayed month (0-indexed)
+let mainView = localStorage.getItem('scal_mainView') || 'month'; // 'month' | 'week' — which calendar layout is showing
+let viewedWeekStart = mondayOf(new Date()); // Date — Monday of the week currently shown in week view
+
+function mondayOf(d){
+  const r = new Date(d);
+  const wd = (r.getDay() + 6) % 7; // 0 = Monday
+  r.setDate(r.getDate() - wd);
+  r.setHours(0, 0, 0, 0);
+  return r;
+}
+function addDaysDate(d, n){ const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function isSameDate(a, b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+function daysInMonth(y, m){ return new Date(y, m + 1, 0).getDate(); }
+function firstDayColumn(y, m){ const wd = new Date(y, m, 1).getDay(); return (wd + 6) % 7; } // Mon-start
+function addMonths(y, m, delta){ const total = y * 12 + m + delta; return { y: Math.floor(total / 12), m: ((total % 12) + 12) % 12 }; }
+function isBeforeMin(y, m){ return y < MIN_YEAR || (y === MIN_YEAR && m < MIN_MONTH); }
+function isAfterMax(y, m){ return y > MAX_YEAR || (y === MAX_YEAR && m > MAX_MONTH); }
+
+let events = []; // {id, year, month, day, title, time, status:'confirmed'|'pending', createdBy}
+let notes = []; // {id, text} — checklist items; checking one off removes it immediately
+let suggestions = []; // {id, text, author}
+let shoppingItems = []; // {id, text, done} — checking one off hides it under "Completed" instead of deleting it
+let editingEventId = null;
+let modalDay = null, modalMonth = null, modalYear = null;
+
+let idCounter = 1;
+function nextId(){ return idCounter++; }
+
+/* ---------- Seed data from July.csv (used only the very first time the shared doc is created) ---------- */
+function seed(){
+  const raw = [
+    [1, "", "3:00 PM", "4:00 PM"],
+    [3, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
+    [4, "EP work", "7:00 AM", "3:00 PM"],
+    [5, "Trial class", "10:00 AM", "11:00 AM"],
+    [6, "Toshi's tennis", "4:00 PM", "6:00 PM"],
+    [7, "Tennis with Tanaka coach", "9:00 AM", "10:30 AM"],
+    [7, "Yuri-chan's pool", "3:00 PM", "4:00 PM"],
+    [8, "Toshi's pool", "3:00 PM", "4:00 PM"],
+    [10, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
+    [11, "EP work", "7:00 AM", "3:00 PM"],
+    [12, "Koinonia @ Miranda's", "6:00 PM", ""],
+    [13, "Toshi's tennis", "4:00 PM", "6:00 PM"],
+    [14, "Tennis with Tanaka coach", "9:00 AM", "10:30 AM"],
+    [14, "Yuri-chan's pool", "3:00 PM", "4:00 PM"],
+    [15, "Dentist", "10:15 AM", ""],
+    [15, "Toshi's pool", "3:00 PM", "4:00 PM"],
+    [17, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
+    [18, "EP work", "7:00 AM", "3:00 PM"],
+    [19, "Birthday party — Alicia's", "", ""],
+    [20, "Toshi's tennis", "4:00 PM", "6:00 PM"],
+    [21, "Tennis with Tanaka coach", "9:00 AM", "10:30 AM"],
+    [21, "Yuri-chan's pool", "3:00 PM", "4:00 PM"],
+    [22, "Toshi's pool", "3:00 PM", "4:00 PM"],
+    [24, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
+    [25, "EP work", "7:00 AM", "3:00 PM"],
+    [27, "Toshi's tennis", "4:00 PM", "6:00 PM"],
+    [28, "Tennis with Tanaka coach", "9:00 AM", "10:30 AM"],
+    [31, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
+  ];
+  raw.forEach(([day, title, start, end]) => {
+    events.push({
+      id: nextId(),
+      year: 2026,
+      month: 6, // July (0-indexed)
+      day,
+      title: title || "Busy",
+      time: formatRange(start, end),
+      status: 'confirmed',
+      createdBy: 'B'
+    });
+  });
+}
+function formatRange(start, end){
+  if(start && end) return start + " – " + end;
+  if(start) return start;
+  return "";
+}
+
+/* ---------- Person color coding ---------- */
+function personKeyFor(e){
+  const t = (e.title || '').toLowerCase();
+  if(t.includes('toshi')) return 'toshi';
+  if(t.includes('yuri')) return 'yuri';
+  if(t.includes('lilly') || t.includes('lily')) return 'lilly';
+  return e.createdBy === 'B' ? 'veron' : 'tomo';
+}
+// Which tab (Tomo's or Veron's) an event belongs to — always based on who created it,
+// never on title content. personKeyFor() above is for color-coding only; using it for
+// tab filtering meant an event like "Toshi's dentist" would vanish from its creator's
+// own tab (since personKeyFor returns 'toshi', which never matches a tab name) while
+// still showing on Everyone.
+function ownerKeyFor(e){
+  return e.createdBy === 'B' ? 'veron' : 'tomo';
+}
+// A kid-named event (title mentions Toshi/Yuri/Lilly) is family-wide territory:
+// on Tomo's tab it always shows and keeps its kid color, regardless of who
+// created it. Veron's tab is pink-only and excludes kid-named events entirely
+// (they still show on Tomo's tab and Everyone).
+function isKidNamed(e){
+  const p = personKeyFor(e);
+  return p === 'toshi' || p === 'yuri' || p === 'lilly';
+}
+function isVisibleOnTab(e, tab){
+  if(tab === 'all') return true;
+  if(tab === 'veron') return ownerKeyFor(e) === 'veron' && !isKidNamed(e);
+  return ownerKeyFor(e) === tab || isKidNamed(e);
+}
+// Veron's tab is pink only, full stop — no kid-color exceptions there. Tomo's
+// tab keeps the kid-named override (green/purple/orange for Toshi/Yuri/Lilly).
+function displayColorKeyFor(e){
+  if(activeTab === 'veron') return 'veron';
+  if(activeTab === 'all' || isKidNamed(e)) return personKeyFor(e);
+  return ownerKeyFor(e);
+}
+// Adding/editing from your own tab is your own personal calendar — no approval
+// needed. Adding/editing from the Everyone tab, or from the other parent's tab
+// (e.g. Tomo poking around Veron's tab), is not your own territory, so it needs
+// the other parent's approval. Based on currentUser (who's actually signed in
+// on this device), never on which tab merely happens to be on screen — see
+// setTab() below for why that distinction matters.
+function needsApproval(){
+  const myTab = currentUser === 'B' ? 'veron' : 'tomo';
+  return activeTab !== myTab;
+}
+function nameSpan(key){
+  const color = key === 'A' ? 'var(--tomo)' : 'var(--veron)';
+  return `<span style="color:${color};font-weight:700;">${userNames[key]}</span>`;
+}
+
+/* ---------- First-run identity picker ---------- */
+function pickIdentity(key){
+  currentUser = key;
+  localStorage.setItem('scal_myIdentity', key);
+  activeTab = key === 'A' ? 'tomo' : 'veron';
+  localStorage.setItem('scal_activeTab', activeTab);
+  document.getElementById('whoOverlay').style.display = 'none';
+  render();
+}
+
+// Reopens the identity picker so a device can be deliberately re-assigned
+// (e.g. it was set up as the wrong person) without clearing site data.
+function openIdentitySwitcher(){
+  document.getElementById('whoOverlay').style.display = 'flex';
+}
+
+/* ---------- Tab switch ---------- */
+function syncTabButtons(){
+  document.getElementById('tabTomo').classList.toggle('active', activeTab==='tomo');
+  document.getElementById('tabVeron').classList.toggle('active', activeTab==='veron');
+  document.getElementById('tabAll').classList.toggle('active', activeTab==='all');
+  document.getElementById('whoamiLabel').textContent = 'Signed in as ' + userNames[currentUser] + ' · switch';
+}
+// Switching tabs only changes which calendar you're LOOKING at — it must never
+// change who you're signed in as. Previously this also overwrote currentUser
+// (and persisted it to localStorage), so tapping the other parent's tab just to
+// peek at their schedule would silently flip your own identity: everything you
+// added afterward got attributed to them instead of you, and vanished from your
+// own tab. Identity is set once via the "Who's using this device?" picker
+// (pickIdentity) and stays put until deliberately changed.
+function setTab(tab){
+  activeTab = tab;
+  localStorage.setItem('scal_activeTab', tab);
+  render();
+}
+
+/* ---------- Month navigation ---------- */
+function prevMonth(){
+  const p = addMonths(viewedYear, viewedMonth, -1);
+  if(isBeforeMin(p.y, p.m)) return;
+  viewedYear = p.y; viewedMonth = p.m;
+  render();
+}
+function nextMonth(){
+  const n = addMonths(viewedYear, viewedMonth, 1);
+  if(isAfterMax(n.y, n.m)) return;
+  viewedYear = n.y; viewedMonth = n.m;
+  render();
+}
+function renderMonthNav(){
+  document.getElementById('monthLabel').textContent = MONTH_NAMES[viewedMonth] + ' ' + viewedYear;
+  const p = addMonths(viewedYear, viewedMonth, -1);
+  const n = addMonths(viewedYear, viewedMonth, 1);
+  document.getElementById('prevMonthBtn').disabled = isBeforeMin(p.y, p.m);
+  document.getElementById('nextMonthBtn').disabled = isAfterMax(n.y, n.m);
+}
+
+/* ---------- Month picker (jump directly to any month in range) ---------- */
+// Works from both Month view (jumps viewedYear/viewedMonth) and Week view
+// (jumps viewedWeekStart to the Monday of the week containing that month's 1st).
+function pickerBaseYearMonth(){
+  if(mainView === 'week') return { y: viewedWeekStart.getFullYear(), m: viewedWeekStart.getMonth() };
+  return { y: viewedYear, m: viewedMonth };
+}
+function openMonthPicker(){
+  const base = pickerBaseYearMonth();
+  const yearSelect = document.getElementById('pickYearSelect');
+  yearSelect.innerHTML = '';
+  for(let y = MIN_YEAR; y <= MAX_YEAR; y++){
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    yearSelect.appendChild(opt);
+  }
+  yearSelect.value = base.y;
+  populateMonthPickerOptions();
+  document.getElementById('monthPickerOverlay').classList.add('open');
+}
+function populateMonthPickerOptions(){
+  const base = pickerBaseYearMonth();
+  const year = Number(document.getElementById('pickYearSelect').value);
+  const firstMonth = year === MIN_YEAR ? MIN_MONTH : 0;
+  const lastMonth = year === MAX_YEAR ? MAX_MONTH : 11;
+  const monthSelect = document.getElementById('pickMonthSelect');
+  const keepMonth = monthSelect.value !== '' ? Number(monthSelect.value) : base.m;
+  monthSelect.innerHTML = '';
+  for(let m = firstMonth; m <= lastMonth; m++){
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = MONTH_NAMES[m];
+    monthSelect.appendChild(opt);
+  }
+  monthSelect.value = (year === base.y && keepMonth >= firstMonth && keepMonth <= lastMonth) ? keepMonth : firstMonth;
+}
+function closeMonthPicker(){
+  document.getElementById('monthPickerOverlay').classList.remove('open');
+}
+function applyMonthPick(){
+  const year = Number(document.getElementById('pickYearSelect').value);
+  const month = Number(document.getElementById('pickMonthSelect').value);
+  if(mainView === 'week'){
+    viewedWeekStart = mondayOf(new Date(year, month, 1));
+  } else {
+    viewedYear = year;
+    viewedMonth = month;
+  }
+  closeMonthPicker();
+  render();
+}
+
+/* ---------- Calendar render ---------- */
+function render(){
+  syncTabButtons();
+  document.getElementById('toggleMonthBtn').classList.toggle('active', mainView === 'month');
+  document.getElementById('toggleWeekBtn').classList.toggle('active', mainView === 'week');
+  document.getElementById('monthViewCard').classList.toggle('hidden', mainView !== 'month');
+  document.getElementById('weekViewCard').classList.toggle('hidden', mainView !== 'week');
+  if(mainView === 'month'){
+    renderMonthNav();
+    renderGrid();
+  } else {
+    renderWeekView();
+  }
+  renderPending();
+  renderSuggestions();
+  renderNotes();
+  renderTodaySchedule();
+  renderShopping();
+}
+
+function setMainView(view){
+  mainView = view;
+  localStorage.setItem('scal_mainView', view);
+  render();
+}
+
+function renderGrid(){
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  const firstCol = firstDayColumn(viewedYear, viewedMonth);
+  const numDays = daysInMonth(viewedYear, viewedMonth);
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === viewedYear && today.getMonth() === viewedMonth;
+
+  for(let i=0; i<firstCol; i++){
+    const cell = document.createElement('div');
+    cell.className = 'day-cell empty';
+    grid.appendChild(cell);
+  }
+
+  for(let day=1; day<=numDays; day++){
+    const cell = document.createElement('div');
+    cell.className = 'day-cell' + (isCurrentMonth && day===today.getDate() ? ' today' : '');
+    cell.onclick = () => openDayModal(day);
+
+    const num = document.createElement('div');
+    num.className = 'day-num';
+    num.textContent = day;
+    cell.appendChild(num);
+
+    const plus = document.createElement('div');
+    plus.className = 'add-hint';
+    plus.textContent = '+';
+    cell.appendChild(plus);
+
+    const dayEvents = events.filter(e => e.year === viewedYear && e.month === viewedMonth && e.day === day && isVisibleOnTab(e, activeTab));
+    const visible = dayEvents.slice(0,3);
+    visible.forEach(e => {
+      const evt = document.createElement('div');
+      evt.className = 'evt ' + e.status + ' person-' + displayColorKeyFor(e);
+      evt.textContent = e.time ? (e.title + ' · ' + e.time) : e.title;
+      evt.onclick = (ev) => { ev.stopPropagation(); openEditModal(e); };
+      cell.appendChild(evt);
+    });
+    if(dayEvents.length > 3){
+      const more = document.createElement('div');
+      more.className = 'evt-more';
+      more.textContent = '+' + (dayEvents.length-3) + ' more';
+      cell.appendChild(more);
+    }
+
+    grid.appendChild(cell);
+  }
+}
+
+/* ---------- Week view ---------- */
+function prevWeek(){ viewedWeekStart = addDaysDate(viewedWeekStart, -7); render(); }
+function nextWeek(){ viewedWeekStart = addDaysDate(viewedWeekStart, 7); render(); }
+function todayWeek(){ viewedWeekStart = mondayOf(new Date()); render(); }
+
+function openDayModalForDate(y, m, d){
+  viewedYear = y; viewedMonth = m;
+  openDayModal(d);
+}
+
+// Covers the full day (not just 6 AM-11 PM) so that a time typed without AM/PM
+// (e.g. "5:00" parsed as 5 AM, see timeSortKeyToDecimal below) never lands above
+// row 0 and gets clipped out of view — that made some events show in Month view
+// (which just prints the time as text) but silently vanish from Week view.
+const WEEK_HOURS = []; for(let h=0; h<=23; h++) WEEK_HOURS.push(h);
+const WEEK_DEFAULT_SCROLL_HOUR = 6; // where the grid scrolls to by default, so a normal daytime schedule still looks the same as before
+let weekScrollInitialized = false; // only auto-scroll once per page load, not on every render (would fight the user's own scrolling)
+const WEEK_ROW_H = 48;
+function weekHourLabel(h){ const period = h>=12?'PM':'AM'; let hh=h%12; if(hh===0) hh=12; return hh+' '+period; }
+
+function eventTimeRange(e){
+  if(!e.time) return { start: null, end: null };
+  const parts = e.time.split(' – ');
+  return { start: timeSortKeyToDecimal(parts[0]), end: parts[1] ? timeSortKeyToDecimal(parts[1]) : null };
+}
+function timeSortKeyToDecimal(str){
+  if(!str) return null;
+  const m = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if(!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const period = (m[3] || '').toUpperCase();
+  if(period === 'PM' && h !== 12) h += 12;
+  if(period === 'AM' && h === 12) h = 0;
+  return h + min / 60;
+}
+
+// The event modal's time fields are native <input type="time">, so AM/PM is
+// picked unambiguously by the control itself instead of being guessed from
+// free text. These two functions are the only place that converts between its
+// 24-hour "HH:MM" value and the "h:mm AM/PM" strings used for storage/display.
+function pad2(n){ return n < 10 ? '0' + n : '' + n; }
+function hhmmTo12Hour(hhmm){
+  if(!hhmm) return '';
+  const [hStr, mStr] = hhmm.split(':');
+  let h = parseInt(hStr, 10);
+  const period = h >= 12 ? 'PM' : 'AM';
+  let hh = h % 12; if(hh === 0) hh = 12;
+  return hh + ':' + mStr + ' ' + period;
+}
+function labelTo24Hour(label){
+  // Reuses the lenient parser above so old ambiguous entries (e.g. "1:45" typed
+  // with no AM/PM, read literally as 1:45 AM) still prefill something when
+  // editing, which the user can then correct with the picker in one tap.
+  const dec = timeSortKeyToDecimal(label);
+  if(dec == null) return '';
+  const h = Math.floor(dec);
+  const m = Math.round((dec - h) * 60);
+  return pad2(h) + ':' + pad2(m);
+}
+
+function renderWeekView(){
+  const dates = []; for(let i=0;i<7;i++) dates.push(addDaysDate(viewedWeekStart, i));
+  const today = new Date();
+  const dow = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  document.getElementById('weekRangeLabel').textContent =
+    dates[0].toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' – ' +
+    dates[6].toLocaleDateString(undefined,{month:'short',day:'numeric'});
+
+  document.getElementById('weekHead').innerHTML = '<div></div>' + dates.map((d,i) => {
+    return `<div class="wd${isSameDate(d,today)?' today':''}"><div>${dow[i]}</div><div class="wnum">${d.getDate()}</div></div>`;
+  }).join('');
+
+  const timeColEl = document.getElementById('weekTimeCol');
+  timeColEl.innerHTML = WEEK_HOURS.map(h => `<div class="week-time-label">${weekHourLabel(h)}</div>`).join('');
+  timeColEl.style.gridTemplateRows = `repeat(${WEEK_HOURS.length}, ${WEEK_ROW_H}px)`;
+
+  const colHeight = WEEK_HOURS.length * WEEK_ROW_H;
+  document.getElementById('weekDayCols').innerHTML = dates.map(d => {
+    const dayEvents = events.filter(e =>
+      e.year === d.getFullYear() && e.month === d.getMonth() && e.day === d.getDate() &&
+      isVisibleOnTab(e, activeTab)
+    );
+    const cards = dayEvents.map(e => {
+      const range = eventTimeRange(e);
+      const start = range.start != null ? range.start : 9;
+      const end = range.end != null ? range.end : start + 1;
+      const top = (start - WEEK_HOURS[0]) * WEEK_ROW_H;
+      const height = Math.max(20, (end - start) * WEEK_ROW_H - 2);
+      return `<div class="week-evt ${e.status} person-${displayColorKeyFor(e)}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditModal(events.find(x=>x.id===${e.id}))">` +
+        `<div class="we-title">${e.status==='pending'?'⏳ ':''}${escapeHtml(e.title)}</div>` +
+        (e.time ? `<div class="we-time">${escapeHtml(e.time)}</div>` : '') +
+        `</div>`;
+    }).join('');
+    return `<div class="week-day-col${isSameDate(d,today)?' today':''}" style="height:${colHeight}px" onclick="openDayModalForDate(${d.getFullYear()},${d.getMonth()},${d.getDate()})">${cards}</div>`;
+  }).join('');
+
+  if(!weekScrollInitialized){
+    weekScrollInitialized = true;
+    document.querySelector('.week-body-scroll').scrollTop = (WEEK_DEFAULT_SCROLL_HOUR - WEEK_HOURS[0]) * WEEK_ROW_H;
+  }
+}
+
+function renderPending(){
+  const list = document.getElementById('pendingList');
+  const pending = events.filter(e => e.status === 'pending');
+  if(pending.length === 0){
+    list.innerHTML = '<div class="empty-note">Nothing waiting on approval.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  pending.forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'pending-item';
+    div.innerHTML = `
+      <strong>${escapeHtml(e.title)}</strong><br>
+      <div class="meta">${MONTH_NAMES[e.month]} ${e.day}, ${e.year}${e.time ? ' · ' + escapeHtml(e.time) : ''} · proposed by ${nameSpan(e.createdBy)}</div>
+      <div class="btnrow">
+        <button class="btn-allow" onclick="approveEvent(${e.id})">Allow</button>
+        <button class="btn-decline" onclick="declineEvent(${e.id})">Decline</button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function renderSuggestions(){
+  const list = document.getElementById('suggList');
+  if(suggestions.length === 0){
+    list.innerHTML = '<div class="empty-note">No suggestions yet.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  suggestions.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'sugg-item';
+    div.innerHTML = `
+      ${escapeHtml(s.text)}
+      <div class="meta">from ${nameSpan(s.author)}</div>
+      <div class="btnrow">
+        <button class="btn-use" onclick="useSuggestion(${s.id})">Add to calendar</button>
+        <button class="btn-dismiss" onclick="dismissSuggestion(${s.id})">Dismiss</button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function renderNotes(){
+  const list = document.getElementById('notesList');
+  if(notes.length === 0){
+    list.innerHTML = '<div class="empty-note">No notes yet.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  notes.forEach(n => {
+    const row = document.createElement('label');
+    row.className = 'note-item';
+    row.innerHTML = `<input type="checkbox" onclick="completeNote(${n.id})"><span>${escapeHtml(n.text)}</span>`;
+    list.appendChild(row);
+  });
+}
+
+function addNote(){
+  const input = document.getElementById('noteInput');
+  const text = input.value.trim();
+  if(!text) return;
+  notes.push({ id: nextId(), text });
+  input.value = '';
+  pushState();
+  render();
+}
+
+function completeNote(id){
+  notes = notes.filter(n => n.id !== id);
+  pushState();
+  render();
+}
+
+/* ---------- Shopping: separate Wishlist and Grocery checklists ---------- */
+// Items created before the split have no `category` — treat those as wishlist so nothing disappears.
+function categoryOf(item){ return item.category || 'wishlist'; }
+
+function renderShoppingCategory(category){
+  const items = shoppingItems.filter(i => categoryOf(i) === category);
+  const active = items.filter(i => !i.done);
+  const completed = items.filter(i => i.done);
+
+  const listEl = document.getElementById(category + 'List');
+  listEl.innerHTML = active.length === 0 ? '<div class="empty-note">Nothing on the list.</div>' : '';
+  active.forEach(item => {
+    const row = document.createElement('label');
+    row.className = 'note-item';
+    row.innerHTML = `<input type="checkbox" onclick="toggleShoppingItem(${item.id})"><span>${escapeHtml(item.text)}</span>`;
+    listEl.appendChild(row);
+  });
+
+  document.getElementById(category + 'CompletedCount').textContent = completed.length;
+  const completedEl = document.getElementById(category + 'CompletedList');
+  completedEl.innerHTML = completed.length === 0 ? '<div class="empty-note">No completed items.</div>' : '';
+  completed.forEach(item => {
+    const row = document.createElement('label');
+    row.className = 'note-item done';
+    row.innerHTML = `<input type="checkbox" checked onclick="toggleShoppingItem(${item.id})"><span>${escapeHtml(item.text)}</span>` +
+      `<button type="button" class="item-delete" title="Delete" onclick="event.preventDefault();event.stopPropagation();deleteShoppingItem(${item.id})">✕</button>`;
+    completedEl.appendChild(row);
+  });
+}
+
+function renderShopping(){
+  renderShoppingCategory('wishlist');
+  renderShoppingCategory('grocery');
+}
+
+function addShoppingItem(category){
+  const input = document.getElementById(category + 'Input');
+  const text = input.value.trim();
+  if(!text) return;
+  shoppingItems.push({ id: nextId(), text, done: false, category });
+  input.value = '';
+  pushState();
+  render();
+}
+
+function toggleShoppingItem(id){
+  const item = shoppingItems.find(i => i.id === id);
+  if(!item) return;
+  item.done = !item.done;
+  pushState();
+  render();
+}
+
+function deleteShoppingItem(id){
+  shoppingItems = shoppingItems.filter(i => i.id !== id);
+  pushState();
+  render();
+}
+
+function toggleCompletedShopping(category){
+  const list = document.getElementById(category + 'CompletedList');
+  const hidden = list.classList.toggle('hidden');
+  document.getElementById(category + 'ToggleArrow').textContent = hidden ? '▾' : '▴';
+}
+
+// Best-effort parse of a free-text time string (e.g. "3:00 PM – 4:00 PM") into
+// minutes-since-midnight, for sorting Today's Schedule chronologically.
+// Untimed or unparseable entries sort to the end.
+function timeSortKey(timeStr){
+  if(!timeStr) return 99999;
+  const m = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if(!m) return 99999;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const period = (m[3] || '').toUpperCase();
+  if(period === 'PM' && h !== 12) h += 12;
+  if(period === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+function renderTodaySchedule(){
+  const list = document.getElementById('todayList');
+  const today = new Date();
+  const todaysEvents = events.filter(e =>
+    e.year === today.getFullYear() && e.month === today.getMonth() && e.day === today.getDate() &&
+    isVisibleOnTab(e, activeTab)
+  );
+  if(todaysEvents.length === 0){
+    list.innerHTML = '<div class="empty-note">Nothing on the calendar today.</div>';
+    return;
+  }
+  const sorted = todaysEvents.slice().sort((a, b) => timeSortKey(a.time) - timeSortKey(b.time));
+  list.innerHTML = '';
+  sorted.forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'evt today-item ' + e.status + ' person-' + displayColorKeyFor(e);
+    div.innerHTML = (e.time ? `<span class="ti-time">${escapeHtml(e.time)}</span>` : '') +
+      `<span class="ti-title">${escapeHtml(e.title)}</span>`;
+    div.onclick = () => openEditModal(e);
+    list.appendChild(div);
+  });
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+/* ---------- Approval logic ---------- */
+function approveEvent(id){
+  const e = events.find(x => x.id === id);
+  if(e) e.status = 'confirmed';
+  pushState();
+  render();
+}
+function declineEvent(id){
+  events = events.filter(x => x.id !== id);
+  pushState();
+  render();
+}
+
+/* ---------- Suggestions ---------- */
+function addSuggestion(){
+  const input = document.getElementById('suggInput');
+  const text = input.value.trim();
+  if(!text) return;
+  suggestions.push({ id: nextId(), text, author: currentUser });
+  input.value = '';
+  pushState();
+  render();
+}
+function dismissSuggestion(id){
+  suggestions = suggestions.filter(s => s.id !== id);
+  pushState();
+  render();
+}
+function useSuggestion(id){
+  const s = suggestions.find(x => x.id === id);
+  if(!s) return;
+  suggestions = suggestions.filter(x => x.id !== id);
+  pushState();
+  const today = new Date();
+  if(!isBeforeMin(today.getFullYear(), today.getMonth()) && !isAfterMax(today.getFullYear(), today.getMonth())){
+    modalYear = today.getFullYear(); modalMonth = today.getMonth(); modalDay = today.getDate();
+  } else {
+    modalYear = viewedYear; modalMonth = viewedMonth; modalDay = 1;
+  }
+  editingEventId = null;
+  document.getElementById('modalTitle').textContent = 'Add event';
+  document.getElementById('evtTitle').value = s.text;
+  document.getElementById('evtStart').value = '';
+  document.getElementById('evtEnd').value = '';
+  document.getElementById('deleteBtn').style.display = 'none';
+  document.getElementById('modalDayLabel').textContent = 'Pick the day for this on the calendar after saving — defaults to ' + MONTH_NAMES[modalMonth] + ' ' + modalDay + ', ' + modalYear + '.';
+  refreshApprovalHint();
+  document.getElementById('overlay').classList.add('open');
+}
+
+/* ---------- Modal / event CRUD ---------- */
+function approvalHintText(){
+  const other = currentUser === 'A' ? 'B' : 'A';
+  if(needsApproval()){
+    return `You're adding this on the Everyone calendar, so it'll need approval from ${nameSpan(other)} before it's confirmed.`;
+  }
+  return `This is on your own personal calendar, so it's confirmed right away — no approval needed.`;
+}
+
+function refreshApprovalHint(){
+  document.getElementById('approvalHint').innerHTML = approvalHintText();
+}
+
+/* ---------- Day detail (click a date to see what's already there, plus an add option) ---------- */
+let dayModalDay = null;
+
+function openDayModal(day){
+  dayModalDay = day;
+  document.getElementById('dayModalTitle').textContent = MONTH_NAMES[viewedMonth] + ' ' + day + ', ' + viewedYear;
+
+  const dayEvents = events.filter(e =>
+    e.year === viewedYear && e.month === viewedMonth && e.day === day &&
+    isVisibleOnTab(e, activeTab)
+  );
+  const list = document.getElementById('dayEventsList');
+  if(dayEvents.length === 0){
+    list.innerHTML = '<div class="empty-note">Nothing scheduled yet.</div>';
+  } else {
+    const sorted = dayEvents.slice().sort((a, b) => timeSortKey(a.time) - timeSortKey(b.time));
+    list.innerHTML = '';
+    sorted.forEach(e => {
+      const div = document.createElement('div');
+      div.className = 'evt today-item ' + e.status + ' person-' + displayColorKeyFor(e);
+      div.innerHTML = (e.time ? `<span class="ti-time">${escapeHtml(e.time)}</span>` : '') +
+        `<span class="ti-title">${escapeHtml(e.title)}</span>`;
+      div.onclick = () => { closeDayModal(); openEditModal(e); };
+      list.appendChild(div);
+    });
+  }
+  document.getElementById('dayOverlay').classList.add('open');
+}
+
+function closeDayModal(){
+  document.getElementById('dayOverlay').classList.remove('open');
+}
+
+function addFromDayModal(){
+  closeDayModal();
+  openAddModal(dayModalDay);
+}
+
+function openAddModal(day){
+  editingEventId = null;
+  modalDay = day; modalMonth = viewedMonth; modalYear = viewedYear;
+  document.getElementById('modalTitle').textContent = 'Add event — ' + MONTH_NAMES[viewedMonth] + ' ' + day + ', ' + viewedYear;
+  document.getElementById('evtTitle').value = '';
+  document.getElementById('evtStart').value = '';
+  document.getElementById('evtEnd').value = '';
+  document.getElementById('deleteBtn').style.display = 'none';
+  document.getElementById('modalDayLabel').textContent = '';
+  refreshApprovalHint();
+  document.getElementById('overlay').classList.add('open');
+}
+
+function openEditModal(e){
+  editingEventId = e.id;
+  modalDay = e.day; modalMonth = e.month; modalYear = e.year;
+  document.getElementById('modalTitle').textContent = 'Edit event — ' + MONTH_NAMES[e.month] + ' ' + e.day + ', ' + e.year;
+  document.getElementById('evtTitle').value = e.title;
+  const [start, end] = (e.time || '').split(' – ');
+  document.getElementById('evtStart').value = labelTo24Hour(start);
+  document.getElementById('evtEnd').value = labelTo24Hour(end);
+  document.getElementById('deleteBtn').style.display = 'inline-block';
+  document.getElementById('modalDayLabel').innerHTML = 'Originally added by ' + nameSpan(e.createdBy) + '.';
+  refreshApprovalHint();
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('overlay').classList.remove('open');
+}
+
+function saveEvent(){
+  const title = document.getElementById('evtTitle').value.trim();
+  if(!title){ return; }
+  const start = hhmmTo12Hour(document.getElementById('evtStart').value);
+  const end = hhmmTo12Hour(document.getElementById('evtEnd').value);
+  const time = formatRange(start, end);
+  const status = needsApproval() ? 'pending' : 'confirmed';
+
+  if(editingEventId){
+    const e = events.find(x => x.id === editingEventId);
+    e.title = title;
+    e.time = time;
+    e.status = status;
+    e.createdBy = currentUser;
+  } else {
+    events.push({
+      id: nextId(),
+      year: modalYear,
+      month: modalMonth,
+      day: modalDay,
+      title,
+      time,
+      status: status,
+      createdBy: currentUser
+    });
+    // jump the view to wherever the new event landed, in case it's a different month
+    viewedYear = modalYear;
+    viewedMonth = modalMonth;
+  }
+  pushState();
+  closeModal();
+  render();
+}
+
+function deleteEvent(){
+  events = events.filter(x => x.id !== editingEventId);
+  pushState();
+  closeModal();
+  render();
+}
+
+/* ================= Cloud sync + notifications ================= */
+let latestModifiedAtMs = 0;
+let lastSeenModifiedAtMs = Number(localStorage.getItem('scal_lastSeenAt') || '0');
+let bannerTimer = null;
+// Guards against a race condition where a save fires with the still-empty
+// default local state before the real shared data has finished loading from
+// Firestore, which would overwrite everyone's data with nothing.
+let hasLoadedRemoteState = false;
+
+function currentStateBlob(){
+  return {
+    events, notes, suggestions, shoppingItems, idCounter,
+    lastModifiedBy: currentUser,
+    lastModifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+}
+
+function pushState(){
+  if(!hasLoadedRemoteState){
+    console.warn('Blocked a save before initial sync finished loading, to avoid overwriting shared data.');
+    return;
+  }
+  stateDocRef.set(currentStateBlob(), { merge: true }).catch((err) => {
+    console.error('Sync failed:', err);
+    document.getElementById('connStatus').textContent = 'Could not save — check your connection.';
+    document.getElementById('connStatus').classList.add('offline');
+  });
+}
+
+function applyRemoteState(data){
+  events = data.events || [];
+  notes = Array.isArray(data.notes) ? data.notes : [];
+  suggestions = data.suggestions || [];
+  shoppingItems = Array.isArray(data.shoppingItems) ? data.shoppingItems : [];
+  idCounter = data.idCounter || 1;
+}
+
+function showBanner(byKey){
+  const el = document.getElementById('syncBanner');
+  el.textContent = '🔔 ' + userNames[byKey] + ' just updated the calendar';
+  el.classList.add('show');
+  document.getElementById('notifyDot').classList.remove('hidden');
+  if(navigator.setAppBadge){ navigator.setAppBadge(1).catch(() => {}); }
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => {
+    document.getElementById('syncBanner').classList.remove('show');
+    if(!document.hidden) ackChanges();
+  }, 4000);
+}
+
+function ackChanges(){
+  lastSeenModifiedAtMs = latestModifiedAtMs;
+  localStorage.setItem('scal_lastSeenAt', String(lastSeenModifiedAtMs));
+  document.getElementById('syncBanner').classList.remove('show');
+  document.getElementById('notifyDot').classList.add('hidden');
+  if(navigator.clearAppBadge){ navigator.clearAppBadge().catch(() => {}); }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden) ackChanges();
+});
+
+/* ---------- Real push notifications (shows up in iPhone Settings -> Notifications once enabled) ---------- */
+// Public VAPID key only — safe to expose client-side. The matching private key
+// lives only in the (future) server-side piece that actually sends pushes.
+const VAPID_PUBLIC_KEY = 'BI7O5XqjoObkPSwO5AiPTOKvKatxunzHTr0sbHIWS5u5RxJXTOpBP1OqzlRIsDSgN_eLAKUg6rsKTLDXnENrG7k';
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+async function enablePushNotifications(){
+  const btn = document.getElementById('enableNotifBtn');
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    alert('Push notifications aren\'t supported in this browser. On iPhone, make sure you opened this from the home screen icon (Add to Home Screen first), not a regular Safari tab.');
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  if(permission !== 'granted'){
+    alert('Notifications permission was not granted. You can turn it on later from iPhone Settings -> Notifications -> Shared Calendar, or by tapping this button again.');
+    return;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    await stateDocRef.set({ ['pushSubscriptions.' + currentUser]: sub.toJSON() }, { merge: true });
+    btn.textContent = 'Notifications On';
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+  } catch(err){
+    console.error('Push subscription failed:', err);
+    alert('Could not enable push notifications: ' + err.message);
+  }
+}
+
+async function refreshNotifButtonState(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub){
+      const btn = document.getElementById('enableNotifBtn');
+      btn.textContent = 'Notifications On';
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+    }
+  } catch(err){ /* ignore */ }
+}
+
+function initSync(){
+  stateDocRef.onSnapshot((doc) => {
+    document.getElementById('connStatus').textContent = '';
+    document.getElementById('connStatus').classList.remove('offline');
+
+    if(!doc.exists){
+      // first ever run for this household: seed it and create the shared doc
+      seed();
+      hasLoadedRemoteState = true;
+      pushState();
+      render();
+      return;
+    }
+
+    const data = doc.data();
+    applyRemoteState(data);
+    hasLoadedRemoteState = true;
+    render();
+
+    const modifiedAtMs = (data.lastModifiedAt && data.lastModifiedAt.toMillis) ? data.lastModifiedAt.toMillis() : Date.now();
+    latestModifiedAtMs = modifiedAtMs;
+    const isRemote = data.lastModifiedBy && data.lastModifiedBy !== currentUser;
+    if(isRemote && modifiedAtMs > lastSeenModifiedAtMs){
+      showBanner(data.lastModifiedBy);
+    }
+  }, (err) => {
+    console.error('Sync listener error:', err);
+    document.getElementById('connStatus').textContent = 'Offline — showing your last synced data.';
+    document.getElementById('connStatus').classList.add('offline');
+  });
+}
+
+/* ---------- Init ---------- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => refreshNotifButtonState())
+      .catch((err) => console.error('SW registration failed:', err));
+  });
+}
+if(!localStorage.getItem('scal_myIdentity')){
+  document.getElementById('whoOverlay').style.display = 'flex';
+}
+render();
+initSync();
+</script>
+
+</body>
+</html>
