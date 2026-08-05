@@ -7,7 +7,7 @@
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#1f5a52">
+<meta name="theme-color" content="#e34a35">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -19,24 +19,24 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#20262b;
-    --paper:#f4f5f1;
+    --ink:#3a2b26;
+    --paper:#fef4f0;
     --panel:#ffffff;
-    --line:#dfe1da;
-    --teal:#1f5a52;
-    --teal-soft:#e4efec;
-    --amber:#d98a3d;
-    --amber-soft:#faedd9;
-    --rose:#b8503f;
-    --rose-soft:#f6e2dd;
-    --muted:#767f78;
+    --line:#ecdcd2;
+    --teal:#e34a35;
+    --teal-soft:#fbe0db;
+    --amber:#c97a3d;
+    --amber-soft:#f1c4a5;
+    --rose:#c2534a;
+    --rose-soft:#f8b3b8;
+    --muted:#9c8177;
     --tomo:#3b6fe0; --tomo-soft:#e3ebfd;
-    --veron:#d9469a; --veron-soft:#fbe1f0;
-    --toshi:#2f9e52; --toshi-soft:#e1f5e7;
-    --yuri:#7c4fd1; --yuri-soft:#ece3fa;
-    --lilly:#d9822b; --lilly-soft:#fbecd9;
+    --veron:#d9469a; --veron-soft:#f3b3cd;
+    --toshi:#b9773f; --toshi-soft:#f1c4a5;
+    --yuri:#c98f63; --yuri-soft:#f7ddce;
+    --lilly:#d68aa0; --lilly-soft:#fbe6ec;
     --radius:10px;
-    --shadow:0 1px 2px rgba(32,38,43,0.06), 0 4px 14px rgba(32,38,43,0.05);
+    --shadow:0 1px 2px rgba(58,43,38,0.06), 0 4px 14px rgba(58,43,38,0.05);
   }
   *{box-sizing:border-box;}
   body{
@@ -59,7 +59,7 @@
   .sync-banner.show{ transform:translateX(-50%) translateY(0); opacity:1; }
 
   .bell{
-    position:relative; border:none; background:#f3f4f0; width:38px; height:38px;
+    position:relative; border:none; background:#f5e9e1; width:38px; height:38px;
     border-radius:10px; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
   }
   .bell .dot{
@@ -84,17 +84,17 @@
     padding:14px 18px; border-bottom:1px solid var(--line);
   }
   .month-nav h2{ font-size:18px; letter-spacing:-0.01em; cursor:pointer; padding:4px 8px; border-radius:8px; transition:background .12s ease; }
-  .month-nav h2:hover{ background:#f3f4f0; }
+  .month-nav h2:hover{ background:#f5e9e1; }
   .month-nav button{
-    border:none; background:#f3f4f0; color:var(--teal); width:34px; height:34px;
+    border:none; background:#f5e9e1; color:var(--teal); width:34px; height:34px;
     border-radius:8px; font-size:14px; cursor:pointer; transition:all .12s ease;
   }
-  .month-nav button:hover:not(:disabled){ background:#e7e9e2; }
+  .month-nav button:hover:not(:disabled){ background:#edd9cc; }
   .month-nav button:disabled{ opacity:0.3; cursor:default; }
 
   .view-tabs{
     display:flex; align-items:center; gap:6px;
-    background:#eef0eb; padding:6px; border-radius:999px;
+    background:#f5e9e1; padding:6px; border-radius:999px;
   }
   .view-tabs button{
     border:none; background:transparent; padding:8px 18px; border-radius:999px;
@@ -106,7 +106,7 @@
   #tabAll{ color:var(--ink); }
   #tabTomo.active{ background:var(--tomo); color:#fff; }
   #tabVeron.active{ background:var(--veron); color:#fff; }
-  #tabAll.active{ background:linear-gradient(90deg, var(--tomo), var(--veron), var(--toshi), var(--yuri), var(--lilly)); color:#fff; }
+  #tabAll.active{ background:var(--teal); color:#fff; }
 
   .today-card-wrap{ padding:20px 32px 0; }
   .today-card-wrap .card{ padding:16px 16px 18px; border-color:var(--rose); border-width:1.5px; }
@@ -141,9 +141,9 @@
     padding:6px; position:relative; overflow:hidden; cursor:pointer;
     transition:background .12s ease;
   }
-  .day-cell:hover{ background:#fbfbf9; }
+  .day-cell:hover{ background:#fdf6f2; }
   .day-cell:nth-child(7n){ border-right:none; }
-  .day-cell.empty{ background:#fafaf8; cursor:default; }
+  .day-cell.empty{ background:#fbefe9; cursor:default; }
   .day-num{ font-size:13px; font-weight:600; color:var(--ink); margin-bottom:4px; }
   .day-cell.today .day-num{
     background:var(--teal); color:#fff; width:22px; height:22px; border-radius:50%;
@@ -153,13 +153,13 @@
     font-size:11px; line-height:1.3; padding:3px 6px; border-radius:6px; margin-bottom:3px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     border-left:3px solid var(--line);
-    background:#f2f3ef; color:var(--ink);
+    background:#f5e9e1; color:var(--ink);
   }
   .evt.person-tomo{ background:var(--tomo-soft); border-left-color:var(--tomo); color:#1d3f8f; }
   .evt.person-veron{ background:var(--veron-soft); border-left-color:var(--veron); color:#8a1f5c; }
-  .evt.person-toshi{ background:var(--toshi-soft); border-left-color:var(--toshi); color:#1c5c33; }
-  .evt.person-yuri{ background:var(--yuri-soft); border-left-color:var(--yuri); color:#4a2c8f; }
-  .evt.person-lilly{ background:var(--lilly-soft); border-left-color:var(--lilly); color:#8a4f16; }
+  .evt.person-toshi{ background:var(--toshi-soft); border-left-color:var(--toshi); color:#7a4a1f; }
+  .evt.person-yuri{ background:var(--yuri-soft); border-left-color:var(--yuri); color:#8a5a2e; }
+  .evt.person-lilly{ background:var(--lilly-soft); border-left-color:var(--lilly); color:#8a3a52; }
   .evt.pending{ border-left-style:dashed; }
   .evt.pending::before{ content:'⏳ '; }
   .evt-more{ font-size:10px; color:var(--muted); padding-left:6px; }
@@ -210,7 +210,7 @@
   .today-item .ti-title{ font-weight:600; }
 
   .sugg-item{
-    background:#f6f7f4; border:1px solid var(--line); border-radius:8px; padding:9px 10px; margin-bottom:8px; font-size:13px;
+    background:#fdf6f2; border:1px solid var(--line); border-radius:8px; padding:9px 10px; margin-bottom:8px; font-size:13px;
   }
   .sugg-item .meta{ font-size:11px; color:var(--muted); margin-bottom:6px; }
   .sugg-item .btnrow{ display:flex; gap:6px; margin-top:7px; }
@@ -229,7 +229,7 @@
 
   /* Modal */
   .overlay{
-    position:fixed; inset:0; background:rgba(32,38,43,0.35); display:none;
+    position:fixed; inset:0; background:rgba(58,43,38,0.35); display:none;
     align-items:center; justify-content:center; z-index:50;
   }
   .overlay.open{ display:flex; }
@@ -264,9 +264,26 @@
 
   .hidden{ display:none; }
 
+  /* ---- Sub-pages (meal plan, expenses) ---- */
+  .sub-page label{ font-size:12px; font-weight:600; color:var(--muted); display:block; margin:10px 0 4px; }
+  .sub-page input[type="text"], .sub-page input[type="number"], .sub-page input[type="date"]{
+    width:100%; border:1px solid var(--line); border-radius:7px; padding:8px 10px;
+    font-size:13.5px; font-family:'Work Sans';
+  }
+  .meal-back-btn{
+    border:none; background:#f5e9e1; color:var(--teal); padding:8px 14px; border-radius:8px;
+    font-size:13px; font-weight:600; cursor:pointer; font-family:'Work Sans';
+  }
+  .meal-back-btn:hover{ background:#edd9cc; }
+  .expense-row{ display:flex; align-items:center; gap:9px; padding:9px 2px; font-size:13px; border-bottom:1px solid var(--line); }
+  .expense-row:last-child{ border-bottom:none; }
+  .expense-row .exp-main{ flex:1; }
+  .expense-row .exp-meta{ color:var(--muted); font-size:11.5px; }
+  .expense-row .exp-amount{ font-weight:700; white-space:nowrap; }
+
   /* ---- Month/Week view toggle ---- */
   .view-toggle{
-    display:flex; gap:4px; background:#eef0eb; padding:4px; border-radius:10px;
+    display:flex; gap:4px; background:#f5e9e1; padding:4px; border-radius:10px;
     margin:14px 18px 0; width:fit-content;
   }
   .view-toggle button{
@@ -279,12 +296,12 @@
   /* ---- Week view ---- */
   .week-nav{ display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); }
   .week-nav button{
-    border:none; background:#f3f4f0; color:var(--teal); padding:8px 14px; border-radius:8px;
+    border:none; background:#f5e9e1; color:var(--teal); padding:8px 14px; border-radius:8px;
     font-size:13px; font-weight:600; cursor:pointer; font-family:'Work Sans';
   }
-  .week-nav button:hover{ background:#e7e9e2; }
+  .week-nav button:hover{ background:#edd9cc; }
   .week-nav .range{ font-weight:600; font-size:15px; margin-left:auto; color:var(--ink); padding:4px 8px; border-radius:8px; transition:background .12s ease; }
-  .week-nav .range:hover{ background:#f3f4f0; }
+  .week-nav .range:hover{ background:#f5e9e1; }
   .week-head{ display:grid; grid-template-columns:52px repeat(7,1fr); border-bottom:1px solid var(--line); }
   .week-head .wd{
     padding:8px 4px; text-align:center; font-size:11px; letter-spacing:.06em;
@@ -313,9 +330,9 @@
   }
   .week-evt.person-tomo{ background:var(--tomo-soft); border-color:var(--tomo); color:#1d3f8f; }
   .week-evt.person-veron{ background:var(--veron-soft); border-color:var(--veron); color:#8a1f5c; }
-  .week-evt.person-toshi{ background:var(--toshi-soft); border-color:var(--toshi); color:#1c5c33; }
-  .week-evt.person-yuri{ background:var(--yuri-soft); border-color:var(--yuri); color:#4a2c8f; }
-  .week-evt.person-lilly{ background:var(--lilly-soft); border-color:var(--lilly); color:#8a4f16; }
+  .week-evt.person-toshi{ background:var(--toshi-soft); border-color:var(--toshi); color:#7a4a1f; }
+  .week-evt.person-yuri{ background:var(--yuri-soft); border-color:var(--yuri); color:#8a5a2e; }
+  .week-evt.person-lilly{ background:var(--lilly-soft); border-color:var(--lilly); color:#8a3a52; }
   .week-evt.pending{ border-style:dashed; }
   .week-evt .we-title{ font-weight:700; line-height:1.15; }
   .week-evt .we-time{ font-size:10px; opacity:.85; }
@@ -329,7 +346,7 @@
     .view-tabs{ padding:4px; }
     .view-tabs button{ padding:6px 10px; font-size:12px; }
     .bell{ width:32px; height:32px; font-size:14px; }
-    #enableNotifBtn{ font-size:11px!important; padding:0 8px!important; height:32px!important; white-space:normal!important; line-height:1.15!important; }
+    #enableNotifBtn, #mealPlanBtn{ font-size:11px!important; padding:0 8px!important; height:32px!important; white-space:normal!important; line-height:1.15!important; }
 
     .today-card-wrap{ padding:10px 8px 0; }
     .layout{ padding:10px 8px 32px; gap:16px; }
@@ -381,13 +398,16 @@
       <button id="tabVeron" onclick="setTab('veron')">Veron</button>
       <button id="tabAll" class="active" onclick="setTab('all')">Everyone</button>
     </div>
+    <button id="mealPlanBtn" onclick="openMealPlan()" style="border:none;background:#f5e9e1;color:var(--amber);padding:0 12px;height:38px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🍽 Meal Plan</button>
     <button class="bell" onclick="ackChanges()" aria-label="Notifications">
       🔔<span class="dot hidden" id="notifyDot"></span>
     </button>
-    <button id="enableNotifBtn" onclick="enablePushNotifications()" style="border:none;background:#f3f4f0;color:var(--teal);padding:0 12px;height:38px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Enable Notifications</button>
+    <button id="enableNotifBtn" onclick="enablePushNotifications()" style="border:none;background:#f5e9e1;color:var(--teal);padding:0 12px;height:38px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Enable Notifications</button>
   </div>
 </div>
 <div class="conn-status" id="connStatus"></div>
+
+<div id="calendarPage">
 
 <div class="today-card-wrap">
   <div class="card">
@@ -477,10 +497,14 @@
         <input id="noteInput" type="text" placeholder="Add a note...">
         <button onclick="addNote()">Add</button>
       </div>
+      <div class="shop-completed-toggle" onclick="toggleCompletedNotes()">
+        <span id="notesToggleArrow">▾</span> Completed (<span id="notesCompletedCount">0</span>)
+      </div>
+      <div id="notesCompletedList" class="shop-completed-list hidden"></div>
     </div>
 
     <div class="card">
-      <h3><span class="dot" style="background:#8a8f7f"></span>Suggestions</h3>
+      <h3><span class="dot" style="background:#9c8177"></span>Suggestions</h3>
       <div id="suggList"></div>
       <div class="sugg-input">
         <input id="suggInput" type="text" placeholder="Suggest an idea, e.g. 'Beach trip w/ Aunt Nica?'">
@@ -488,6 +512,80 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+</div><!-- /calendarPage -->
+
+<div id="expensesPage" class="hidden sub-page">
+  <div class="today-card-wrap">
+    <button class="meal-back-btn" onclick="closeExpenses()">← Back to Meal Plan</button>
+  </div>
+  <div class="layout" style="grid-template-columns:1fr;">
+    <div class="col-main">
+      <div class="card list-card">
+        <h3><span class="dot" style="background:var(--amber)"></span>Add expense</h3>
+        <label>Description</label>
+        <input id="expenseDesc" type="text" placeholder="e.g. Groceries">
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <div style="flex:1;">
+            <label>Amount (¥)</label>
+            <input id="expenseAmount" type="number" min="0" step="1" placeholder="0">
+          </div>
+          <div style="flex:1;">
+            <label>Date</label>
+            <input id="expenseDate" type="date">
+          </div>
+        </div>
+        <button onclick="addExpense()" style="margin-top:14px;background:var(--teal);color:#fff;border:none;border-radius:7px;padding:9px 16px;font-weight:600;cursor:pointer;font-size:13.5px;">Add expense</button>
+      </div>
+
+      <div class="card list-card" style="margin-top:24px;">
+        <h3><span class="dot" style="background:var(--teal)"></span>Totals</h3>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:14px;">
+          <div><span style="color:var(--tomo);font-weight:700;">Tomo</span>: <strong id="expenseTotalTomo">¥0</strong></div>
+          <div><span style="color:var(--veron);font-weight:700;">Veron</span>: <strong id="expenseTotalVeron">¥0</strong></div>
+          <div>Total: <strong id="expenseTotalAll">¥0</strong></div>
+        </div>
+      </div>
+
+      <div class="card list-card" style="margin-top:24px;">
+        <h3><span class="dot" style="background:var(--rose)"></span>Expense log</h3>
+        <div id="expensesList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="mealPlanPage" class="hidden sub-page">
+  <div class="today-card-wrap">
+    <button class="meal-back-btn" onclick="closeMealPlan()">← Back to Calendar</button>
+    <button class="meal-back-btn" onclick="openExpenses()" style="margin-left:8px;background:var(--amber-soft);color:#8a5b20;">💰 Expenses</button>
+  </div>
+  <div class="layout" style="grid-template-columns:1fr;">
+    <div class="col-main">
+      <div class="lists-row">
+        <div class="card list-card">
+          <h3><span class="dot" style="background:var(--yuri)"></span>Yuri, Lilly &amp; Toshi</h3>
+          <label>Breakfast</label>
+          <input id="mealKidsBreakfast" type="text" placeholder="e.g. Rice, tamagoyaki" onchange="updateMealPlan('kids','breakfast',this.value)">
+          <label>Lunch</label>
+          <input id="mealKidsLunch" type="text" placeholder="e.g. Onigiri" onchange="updateMealPlan('kids','lunch',this.value)">
+          <label>Dinner</label>
+          <input id="mealKidsDinner" type="text" placeholder="e.g. Curry rice" onchange="updateMealPlan('kids','dinner',this.value)">
+        </div>
+
+        <div class="card list-card">
+          <h3><span class="dot" style="background:var(--veron)"></span>Veron</h3>
+          <label>Breakfast</label>
+          <input id="mealVeronBreakfast" type="text" placeholder="e.g. Toast" onchange="updateMealPlan('veron','breakfast',this.value)">
+          <label>Lunch</label>
+          <input id="mealVeronLunch" type="text" placeholder="e.g. Salad" onchange="updateMealPlan('veron','lunch',this.value)">
+          <label>Dinner</label>
+          <input id="mealVeronDinner" type="text" placeholder="e.g. Grilled fish" onchange="updateMealPlan('veron','dinner',this.value)">
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -586,7 +684,7 @@ const userNames = { A: "Tomo", B: "Veron" };
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MIN_YEAR = 2026, MIN_MONTH = 6;  // July 2026
 const MAX_YEAR = 2027, MAX_MONTH = 11; // December 2027
-let viewedYear = 2026, viewedMonth = 6; // currently displayed month (0-indexed)
+let viewedYear = new Date().getFullYear(), viewedMonth = new Date().getMonth(); // currently displayed month (0-indexed), defaults to today
 let mainView = localStorage.getItem('scal_mainView') || 'month'; // 'month' | 'week' — which calendar layout is showing
 let viewedWeekStart = mondayOf(new Date()); // Date — Monday of the week currently shown in week view
 
@@ -610,6 +708,8 @@ let events = []; // {id, year, month, day, title, time, status:'confirmed'|'pend
 let notes = []; // {id, text} — checklist items; checking one off removes it immediately
 let suggestions = []; // {id, text, author}
 let shoppingItems = []; // {id, text, done} — checking one off hides it under "Completed" instead of deleting it
+let mealPlan = { kids: { breakfast:'', lunch:'', dinner:'' }, veron: { breakfast:'', lunch:'', dinner:'' } }; // one running plan, no dates — kids share a plan, Veron has a separate one
+let expenses = []; // {id, description, amount, date:'YYYY-MM-DD', paidBy:'A'|'B'} — attributed to whoever added it, like suggestions
 let editingEventId = null;
 let modalDay = null, modalMonth = null, modalYear = null;
 
@@ -846,6 +946,8 @@ function render(){
   renderNotes();
   renderTodaySchedule();
   renderShopping();
+  renderMealPlan();
+  renderExpenses();
 }
 
 function setMainView(view){
@@ -1052,18 +1154,31 @@ function renderSuggestions(){
   });
 }
 
+// Checking a note off marks it done and moves it into the collapsible
+// Completed section instead of deleting it — mirrors renderShoppingCategory
+// below, so a note can be unchecked (retrieved) or permanently deleted from there.
 function renderNotes(){
+  const active = notes.filter(n => !n.done);
+  const completed = notes.filter(n => n.done);
+
   const list = document.getElementById('notesList');
-  if(notes.length === 0){
-    list.innerHTML = '<div class="empty-note">No notes yet.</div>';
-    return;
-  }
-  list.innerHTML = '';
-  notes.forEach(n => {
+  list.innerHTML = active.length === 0 ? '<div class="empty-note">No notes yet.</div>' : '';
+  active.forEach(n => {
     const row = document.createElement('label');
     row.className = 'note-item';
-    row.innerHTML = `<input type="checkbox" onclick="completeNote(${n.id})"><span>${escapeHtml(n.text)}</span>`;
+    row.innerHTML = `<input type="checkbox" onclick="toggleNote(${n.id})"><span>${escapeHtml(n.text)}</span>`;
     list.appendChild(row);
+  });
+
+  document.getElementById('notesCompletedCount').textContent = completed.length;
+  const completedEl = document.getElementById('notesCompletedList');
+  completedEl.innerHTML = completed.length === 0 ? '<div class="empty-note">No completed notes.</div>' : '';
+  completed.forEach(n => {
+    const row = document.createElement('label');
+    row.className = 'note-item done';
+    row.innerHTML = `<input type="checkbox" checked onclick="toggleNote(${n.id})"><span>${escapeHtml(n.text)}</span>` +
+      `<button type="button" class="item-delete" title="Delete" onclick="event.preventDefault();event.stopPropagation();deleteNote(${n.id})">✕</button>`;
+    completedEl.appendChild(row);
   });
 }
 
@@ -1071,16 +1186,30 @@ function addNote(){
   const input = document.getElementById('noteInput');
   const text = input.value.trim();
   if(!text) return;
-  notes.push({ id: nextId(), text });
+  notes.push({ id: nextId(), text, done: false });
   input.value = '';
   pushState();
   render();
 }
 
-function completeNote(id){
+function toggleNote(id){
+  const n = notes.find(x => x.id === id);
+  if(!n) return;
+  n.done = !n.done;
+  pushState();
+  render();
+}
+
+function deleteNote(id){
   notes = notes.filter(n => n.id !== id);
   pushState();
   render();
+}
+
+function toggleCompletedNotes(){
+  const list = document.getElementById('notesCompletedList');
+  const hidden = list.classList.toggle('hidden');
+  document.getElementById('notesToggleArrow').textContent = hidden ? '▾' : '▴';
 }
 
 /* ---------- Shopping: separate Wishlist and Grocery checklists ---------- */
@@ -1146,6 +1275,110 @@ function toggleCompletedShopping(category){
   const list = document.getElementById(category + 'CompletedList');
   const hidden = list.classList.toggle('hidden');
   document.getElementById(category + 'ToggleArrow').textContent = hidden ? '▾' : '▴';
+}
+
+/* ---------- Meal plan: separate page, two groups (kids / Veron), no dates ---------- */
+function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function openMealPlan(){
+  document.getElementById('calendarPage').classList.add('hidden');
+  document.getElementById('mealPlanPage').classList.remove('hidden');
+  renderMealPlan();
+}
+function closeMealPlan(){
+  document.getElementById('mealPlanPage').classList.add('hidden');
+  document.getElementById('calendarPage').classList.remove('hidden');
+}
+
+function updateMealPlan(group, meal, value){
+  mealPlan[group][meal] = value;
+  pushState();
+}
+
+// Skips fields the user is actively typing in, so a remote update landing
+// mid-edit (another device's onSnapshot firing render()) can't clobber
+// keystrokes that haven't been committed (onchange) yet.
+function renderMealPlan(){
+  ['kids','veron'].forEach(group => {
+    ['breakfast','lunch','dinner'].forEach(meal => {
+      const el = document.getElementById('meal' + capitalize(group) + capitalize(meal));
+      if(el && document.activeElement !== el) el.value = (mealPlan[group] && mealPlan[group][meal]) || '';
+    });
+  });
+}
+
+/* ---------- Expenses: reached from the Meal Plan page, one shared log tagged by who paid ---------- */
+function todayISODate(){
+  const d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
+}
+function formatExpenseDate(iso){
+  if(!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  if(!y || !m || !d) return iso;
+  return MONTH_NAMES[m-1].slice(0,3) + ' ' + d + ', ' + y;
+}
+
+function openExpenses(){
+  document.getElementById('mealPlanPage').classList.add('hidden');
+  document.getElementById('expensesPage').classList.remove('hidden');
+  document.getElementById('expenseDate').value = todayISODate();
+  renderExpenses();
+}
+function closeExpenses(){
+  document.getElementById('expensesPage').classList.add('hidden');
+  document.getElementById('mealPlanPage').classList.remove('hidden');
+}
+
+function addExpense(){
+  const descInput = document.getElementById('expenseDesc');
+  const amountInput = document.getElementById('expenseAmount');
+  const dateInput = document.getElementById('expenseDate');
+  const description = descInput.value.trim();
+  const amount = parseFloat(amountInput.value);
+  if(!description || !(amount > 0)) return;
+  const date = dateInput.value || todayISODate();
+  expenses.push({ id: nextId(), description, amount, date, paidBy: currentUser });
+  descInput.value = '';
+  amountInput.value = '';
+  dateInput.value = todayISODate();
+  pushState();
+  render();
+}
+
+function deleteExpense(id){
+  expenses = expenses.filter(x => x.id !== id);
+  pushState();
+  render();
+}
+
+function renderExpenses(){
+  const totals = { A: 0, B: 0 };
+  expenses.forEach(e => { totals[e.paidBy] = (totals[e.paidBy] || 0) + e.amount; });
+  document.getElementById('expenseTotalTomo').textContent = '¥' + totals.A.toLocaleString();
+  document.getElementById('expenseTotalVeron').textContent = '¥' + totals.B.toLocaleString();
+  document.getElementById('expenseTotalAll').textContent = '¥' + (totals.A + totals.B).toLocaleString();
+
+  const list = document.getElementById('expensesList');
+  if(expenses.length === 0){
+    list.innerHTML = '<div class="empty-note">No expenses recorded yet.</div>';
+    return;
+  }
+  const sorted = expenses.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.id - a.id);
+  list.innerHTML = '';
+  sorted.forEach(e => {
+    const row = document.createElement('div');
+    row.className = 'expense-row';
+    row.innerHTML = `
+      <div class="exp-main">
+        ${escapeHtml(e.description)}
+        <div class="exp-meta">${formatExpenseDate(e.date)} · ${nameSpan(e.paidBy)}</div>
+      </div>
+      <div class="exp-amount">¥${Number(e.amount).toLocaleString()}</div>
+      <button type="button" class="item-delete" title="Delete" onclick="deleteExpense(${e.id})">✕</button>
+    `;
+    list.appendChild(row);
+  });
 }
 
 // Best-effort parse of a free-text time string (e.g. "3:00 PM – 4:00 PM") into
@@ -1376,7 +1609,7 @@ let hasLoadedRemoteState = false;
 
 function currentStateBlob(){
   return {
-    events, notes, suggestions, shoppingItems, idCounter,
+    events, notes, suggestions, shoppingItems, mealPlan, expenses, idCounter,
     lastModifiedBy: currentUser,
     lastModifiedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -1399,6 +1632,8 @@ function applyRemoteState(data){
   notes = Array.isArray(data.notes) ? data.notes : [];
   suggestions = data.suggestions || [];
   shoppingItems = Array.isArray(data.shoppingItems) ? data.shoppingItems : [];
+  mealPlan = data.mealPlan || { kids: { breakfast:'', lunch:'', dinner:'' }, veron: { breakfast:'', lunch:'', dinner:'' } };
+  expenses = Array.isArray(data.expenses) ? data.expenses : [];
   idCounter = data.idCounter || 1;
 }
 
