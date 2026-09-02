@@ -701,7 +701,14 @@ let editingEventId = null;
 let modalDay = null, modalMonth = null, modalYear = null;
 
 let idCounter = 1;
-function nextId(){ return idCounter++; }
+// IDs must stay numeric (they're interpolated unquoted into inline onclick
+// handlers), but the old sequential counter collided when both phones added
+// something before syncing. Millisecond timestamp * 1000 + random keeps IDs
+// numeric, ordered, and effectively unique across devices.
+function nextId(){
+  idCounter++; // kept only so older clients reading the doc don't choke
+  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+}
 
 /* ---------- Seed data from July.csv (used only the very first time the shared doc is created) ---------- */
 function seed(){
@@ -1647,7 +1654,10 @@ async function enablePushNotifications(){
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
     }
-    await stateDocRef.set({ ['pushSubscriptions.' + currentUser]: sub.toJSON() }, { merge: true });
+    // Must be a nested object, not a "pushSubscriptions.A" key — set() with merge
+    // treats a dotted key as a literal field name, so the Cloud Function (which
+    // reads data.pushSubscriptions[user]) would never find it.
+    await stateDocRef.set({ pushSubscriptions: { [currentUser]: sub.toJSON() } }, { merge: true });
     btn.textContent = 'Notifications On';
     btn.disabled = true;
     btn.style.opacity = '0.6';
@@ -1667,6 +1677,10 @@ async function refreshNotifButtonState(){
       btn.textContent = 'Notifications On';
       btn.disabled = true;
       btn.style.opacity = '0.6';
+      // Re-persist on every load so anyone who subscribed under the old broken
+      // "pushSubscriptions.A" shape gets migrated to the nested map the function reads.
+      stateDocRef.set({ pushSubscriptions: { [currentUser]: sub.toJSON() } }, { merge: true })
+        .catch((err) => console.warn('Could not re-save push subscription:', err));
     }
   } catch(err){ /* ignore */ }
 }

@@ -39,6 +39,8 @@ exports.notifyOnCalendarChange = onDocumentWritten(
       title: 'Shared Calendar',
       body: `${userNames[modifiedBy]} just updated the calendar`,
       url: './',
+      icon: './icon-192.png',
+      badge: './favicon-32.png',
     });
 
     try {
