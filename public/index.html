@@ -110,6 +110,7 @@
 
   .today-card-wrap{ padding:20px 32px 0; }
   .today-card-wrap .card{ padding:16px 16px 18px; border-color:var(--rose); border-width:1.5px; }
+  .today-card-wrap .card + .card{ margin-top:12px; border-color:var(--amber); }
   .today-card-wrap h3{ font-size:15px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
   .today-card-wrap h3 .dot{ width:8px; height:8px; border-radius:50%; }
 
@@ -208,14 +209,6 @@
   }
   .today-item .ti-time{ font-size:11px; color:var(--muted); font-weight:700; white-space:nowrap; }
   .today-item .ti-title{ font-weight:600; }
-
-  .sugg-item{
-    background:#fdf6f2; border:1px solid var(--line); border-radius:8px; padding:9px 10px; margin-bottom:8px; font-size:13px;
-  }
-  .sugg-item .meta{ font-size:11px; color:var(--muted); margin-bottom:6px; }
-  .sugg-item .btnrow{ display:flex; gap:6px; margin-top:7px; }
-  .btn-use{ background:var(--teal); color:#fff; }
-  .btn-dismiss{ background:transparent; color:var(--muted); border:1px solid var(--line)!important; }
 
   .sugg-input, .note-inline{
     display:flex; gap:6px; margin-top:8px;
@@ -414,6 +407,10 @@
     <h3><span class="dot" style="background:var(--rose)"></span>Today's Schedule</h3>
     <div id="todayList"></div>
   </div>
+  <div class="card">
+    <h3><span class="dot" style="background:var(--amber)"></span>Tomorrow's Schedule</h3>
+    <div id="tomorrowList"></div>
+  </div>
 </div>
 
 <div class="layout">
@@ -501,15 +498,6 @@
         <span id="notesToggleArrow">▾</span> Completed (<span id="notesCompletedCount">0</span>)
       </div>
       <div id="notesCompletedList" class="shop-completed-list hidden"></div>
-    </div>
-
-    <div class="card">
-      <h3><span class="dot" style="background:#9c8177"></span>Suggestions</h3>
-      <div id="suggList"></div>
-      <div class="sugg-input">
-        <input id="suggInput" type="text" placeholder="Suggest an idea, e.g. 'Beach trip w/ Aunt Nica?'">
-        <button onclick="addSuggestion()">Add</button>
-      </div>
     </div>
 
   </div>
@@ -706,10 +694,9 @@ function isAfterMax(y, m){ return y > MAX_YEAR || (y === MAX_YEAR && m > MAX_MON
 
 let events = []; // {id, year, month, day, title, time, status:'confirmed'|'pending', createdBy}
 let notes = []; // {id, text} — checklist items; checking one off removes it immediately
-let suggestions = []; // {id, text, author}
 let shoppingItems = []; // {id, text, done} — checking one off hides it under "Completed" instead of deleting it
 let mealPlan = { kids: { breakfast:'', lunch:'', dinner:'' }, veron: { breakfast:'', lunch:'', dinner:'' } }; // one running plan, no dates — kids share a plan, Veron has a separate one
-let expenses = []; // {id, description, amount, date:'YYYY-MM-DD', paidBy:'A'|'B'} — attributed to whoever added it, like suggestions
+let expenses = []; // {id, description, amount, date:'YYYY-MM-DD', paidBy:'A'|'B'} — attributed to whoever added it
 let editingEventId = null;
 let modalDay = null, modalMonth = null, modalYear = null;
 
@@ -942,9 +929,9 @@ function render(){
     renderWeekView();
   }
   renderPending();
-  renderSuggestions();
   renderNotes();
   renderTodaySchedule();
+  renderTomorrowSchedule();
   renderShopping();
   renderMealPlan();
   renderExpenses();
@@ -1126,28 +1113,6 @@ function renderPending(){
       <div class="btnrow">
         <button class="btn-allow" onclick="approveEvent(${e.id})">Allow</button>
         <button class="btn-decline" onclick="declineEvent(${e.id})">Decline</button>
-      </div>
-    `;
-    list.appendChild(div);
-  });
-}
-
-function renderSuggestions(){
-  const list = document.getElementById('suggList');
-  if(suggestions.length === 0){
-    list.innerHTML = '<div class="empty-note">No suggestions yet.</div>';
-    return;
-  }
-  list.innerHTML = '';
-  suggestions.forEach(s => {
-    const div = document.createElement('div');
-    div.className = 'sugg-item';
-    div.innerHTML = `
-      ${escapeHtml(s.text)}
-      <div class="meta">from ${nameSpan(s.author)}</div>
-      <div class="btnrow">
-        <button class="btn-use" onclick="useSuggestion(${s.id})">Add to calendar</button>
-        <button class="btn-dismiss" onclick="dismissSuggestion(${s.id})">Dismiss</button>
       </div>
     `;
     list.appendChild(div);
@@ -1419,6 +1384,30 @@ function renderTodaySchedule(){
   });
 }
 
+function renderTomorrowSchedule(){
+  const list = document.getElementById('tomorrowList');
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowsEvents = events.filter(e =>
+    e.year === tomorrow.getFullYear() && e.month === tomorrow.getMonth() && e.day === tomorrow.getDate() &&
+    isVisibleOnTab(e, activeTab)
+  );
+  if(tomorrowsEvents.length === 0){
+    list.innerHTML = '<div class="empty-note">Nothing on the calendar tomorrow.</div>';
+    return;
+  }
+  const sorted = tomorrowsEvents.slice().sort((a, b) => timeSortKey(a.time) - timeSortKey(b.time));
+  list.innerHTML = '';
+  sorted.forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'evt today-item ' + e.status + ' person-' + displayColorKeyFor(e);
+    div.innerHTML = (e.time ? `<span class="ti-time">${escapeHtml(e.time)}</span>` : '') +
+      `<span class="ti-title">${escapeHtml(e.title)}</span>`;
+    div.onclick = () => openEditModal(e);
+    list.appendChild(div);
+  });
+}
+
 function escapeHtml(str){
   const d = document.createElement('div');
   d.textContent = str;
@@ -1436,43 +1425,6 @@ function declineEvent(id){
   events = events.filter(x => x.id !== id);
   pushState();
   render();
-}
-
-/* ---------- Suggestions ---------- */
-function addSuggestion(){
-  const input = document.getElementById('suggInput');
-  const text = input.value.trim();
-  if(!text) return;
-  suggestions.push({ id: nextId(), text, author: currentUser });
-  input.value = '';
-  pushState();
-  render();
-}
-function dismissSuggestion(id){
-  suggestions = suggestions.filter(s => s.id !== id);
-  pushState();
-  render();
-}
-function useSuggestion(id){
-  const s = suggestions.find(x => x.id === id);
-  if(!s) return;
-  suggestions = suggestions.filter(x => x.id !== id);
-  pushState();
-  const today = new Date();
-  if(!isBeforeMin(today.getFullYear(), today.getMonth()) && !isAfterMax(today.getFullYear(), today.getMonth())){
-    modalYear = today.getFullYear(); modalMonth = today.getMonth(); modalDay = today.getDate();
-  } else {
-    modalYear = viewedYear; modalMonth = viewedMonth; modalDay = 1;
-  }
-  editingEventId = null;
-  document.getElementById('modalTitle').textContent = 'Add event';
-  document.getElementById('evtTitle').value = s.text;
-  document.getElementById('evtStart').value = '';
-  document.getElementById('evtEnd').value = '';
-  document.getElementById('deleteBtn').style.display = 'none';
-  document.getElementById('modalDayLabel').textContent = 'Pick the day for this on the calendar after saving — defaults to ' + MONTH_NAMES[modalMonth] + ' ' + modalDay + ', ' + modalYear + '.';
-  refreshApprovalHint();
-  document.getElementById('overlay').classList.add('open');
 }
 
 /* ---------- Modal / event CRUD ---------- */
@@ -1609,7 +1561,7 @@ let hasLoadedRemoteState = false;
 
 function currentStateBlob(){
   return {
-    events, notes, suggestions, shoppingItems, mealPlan, expenses, idCounter,
+    events, notes, shoppingItems, mealPlan, expenses, idCounter,
     lastModifiedBy: currentUser,
     lastModifiedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -1630,7 +1582,6 @@ function pushState(){
 function applyRemoteState(data){
   events = data.events || [];
   notes = Array.isArray(data.notes) ? data.notes : [];
-  suggestions = data.suggestions || [];
   shoppingItems = Array.isArray(data.shoppingItems) ? data.shoppingItems : [];
   mealPlan = data.mealPlan || { kids: { breakfast:'', lunch:'', dinner:'' }, veron: { breakfast:'', lunch:'', dinner:'' } };
   expenses = Array.isArray(data.expenses) ? data.expenses : [];
