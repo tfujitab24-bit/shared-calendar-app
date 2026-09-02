@@ -18,12 +18,11 @@ const VAPID_CONTACT = 'mailto:borromeoveronica980@gmail.com';
 // by subtracting 9 hours — no timezone library needed.
 const TOKYO_UTC_OFFSET_HOURS = 9;
 
-// Fire a reminder when an event starts within this many minutes...
+// Remind about any confirmed event starting within this many minutes that we
+// haven't already reminded about. Dedup (reminderState) means each event fires
+// exactly once, so a wide window is fine — it just makes the feature resilient
+// to missed scheduler ticks and lets a freshly-added soon event still get a ping.
 const REMINDER_LEAD_MIN = 60;
-// ...checked on a 5-minute schedule, so anything 45–60 min out gets exactly one
-// reminder (dedup handles the overlapping ticks). A wider window survives a brief
-// scheduler outage without double-reminding.
-const REMINDER_WINDOW_MIN = 15;
 
 function configureWebPush() {
   webpush.setVapidDetails(
@@ -40,6 +39,7 @@ function configureWebPush() {
 async function sendPush(householdRef, userKey, subscription, payload) {
   try {
     await webpush.sendNotification(subscription, JSON.stringify(payload));
+    console.log(`Push to ${userKey} sent OK`);
   } catch (err) {
     console.error(`Push to ${userKey} failed:`, err.statusCode, err.body);
     if (err.statusCode === 410 || err.statusCode === 404) {
@@ -48,6 +48,24 @@ async function sendPush(householdRef, userKey, subscription, payload) {
       });
     }
   }
+}
+
+// Push subscriptions for A and B. Reads the nested `pushSubscriptions` map, but
+// falls back to the legacy flat "pushSubscriptions.A" / ".B" fields that older
+// clients wrote via set()+merge (which does not expand dotted keys) — so a
+// person who enabled notifications before that bug was fixed still gets pushes
+// without having to re-open the app.
+function getSubscriptions(data) {
+  const nested =
+    data.pushSubscriptions && typeof data.pushSubscriptions === 'object'
+      ? { ...data.pushSubscriptions }
+      : {};
+  for (const u of ['A', 'B']) {
+    if (!nested[u] && data[`pushSubscriptions.${u}`]) {
+      nested[u] = data[`pushSubscriptions.${u}`];
+    }
+  }
+  return nested;
 }
 
 // Best-effort parse of the free-text time field ("3:00 PM – 4:00 PM", or just
@@ -97,7 +115,7 @@ exports.notifyOnCalendarChange = onDocumentWritten(
     if (modifiedBy !== 'A' && modifiedBy !== 'B') return;
 
     const otherUser = modifiedBy === 'A' ? 'B' : 'A';
-    const subscription = after.pushSubscriptions && after.pushSubscriptions[otherUser];
+    const subscription = getSubscriptions(after)[otherUser];
     if (!subscription) return; // other person hasn't enabled notifications on any device
 
     configureWebPush();
@@ -124,16 +142,25 @@ exports.remindUpcomingEvents = onSchedule(
   async () => {
     const now = Date.now();
     const households = await db.collection('households').get();
-    if (households.empty) return;
+    if (households.empty) {
+      console.log('remindUpcomingEvents: no household docs');
+      return;
+    }
 
     configureWebPush();
 
     for (const householdDoc of households.docs) {
       const data = householdDoc.data() || {};
       const events = Array.isArray(data.events) ? data.events : [];
-      const subs = data.pushSubscriptions || {};
+      const subs = getSubscriptions(data);
       const recipients = ['A', 'B'].filter((u) => subs[u]);
-      if (recipients.length === 0) continue;
+
+      if (recipients.length === 0) {
+        console.log(
+          `remindUpcomingEvents[${householdDoc.id}]: nobody has notifications enabled — skipping`
+        );
+        continue;
+      }
 
       const stateRef = db.collection('reminderState').doc(householdDoc.id);
       const stateSnap = await stateRef.get();
@@ -163,18 +190,27 @@ exports.remindUpcomingEvents = onSchedule(
         if (minutesUntil > -60) stillRelevant.add(String(e.id));
 
         if (
+          minutesUntil > 0 &&
           minutesUntil <= REMINDER_LEAD_MIN &&
-          minutesUntil > REMINDER_LEAD_MIN - REMINDER_WINDOW_MIN &&
           !reminded.has(String(e.id))
         ) {
-          toNotify.push({ event: e, label: parsed.label });
+          toNotify.push({ event: e, minutesUntil });
         }
       }
 
-      for (const { event: e, label } of toNotify) {
+      console.log(
+        `remindUpcomingEvents[${householdDoc.id}]: ${events.length} events, ` +
+          `recipients=[${recipients}], ${toNotify.length} to remind`
+      );
+
+      for (const { event: e, minutesUntil } of toNotify) {
+        const when =
+          minutesUntil >= 50
+            ? 'in about an hour'
+            : `in about ${Math.max(5, Math.round(minutesUntil / 5) * 5)} minutes`;
         const payload = {
           title: '⏰ Upcoming event',
-          body: `${e.title} starts in 1 hour (${label})`,
+          body: `${e.title} starts ${when}`,
           url: './',
           icon: './icon-192.png',
           badge: './favicon-32.png',
@@ -182,6 +218,9 @@ exports.remindUpcomingEvents = onSchedule(
         for (const u of recipients) {
           await sendPush(householdDoc.ref, u, subs[u], payload);
         }
+        console.log(
+          `remindUpcomingEvents[${householdDoc.id}]: reminded "${e.title}" (${Math.round(minutesUntil)}m out)`
+        );
         reminded.add(String(e.id));
         stillRelevant.add(String(e.id));
       }
