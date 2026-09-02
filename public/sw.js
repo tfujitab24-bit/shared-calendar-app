@@ -7,7 +7,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Shared Calendar', body: 'The calendar was updated', url: './' };
+  let data = { title: 'Shared Calendar', body: 'The calendar was updated', url: './', icon: './icon-192.png', badge: './favicon-32.png' };
   if (event.data) {
     try {
       data = event.data.json();
