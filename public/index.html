@@ -1691,6 +1691,11 @@ function initSync(){
     document.getElementById('connStatus').classList.remove('offline');
 
     if(!doc.exists){
+      // A cache-only snapshot (phone couldn't reach Firestore within ~10s) also
+      // reports exists=false even though the shared doc is there. Seeding then
+      // overwrote everyone's data with the July sample (happened 2026-11-19).
+      // Only the server can say the doc is really missing — wait for it.
+      if(doc.metadata.fromCache) return;
       // first ever run for this household: seed it and create the shared doc
       seed();
       hasLoadedRemoteState = true;
