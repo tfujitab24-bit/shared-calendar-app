@@ -979,7 +979,8 @@ function renderGrid(){
     plus.textContent = '+';
     cell.appendChild(plus);
 
-    const dayEvents = events.filter(e => e.year === viewedYear && e.month === viewedMonth && e.day === day && isVisibleOnTab(e, activeTab));
+    const dayEvents = events.filter(e => e.year === viewedYear && e.month === viewedMonth && e.day === day && isVisibleOnTab(e, activeTab))
+      .sort((a, b) => timeSortKey(a.time) - timeSortKey(b.time));
     const visible = dayEvents.slice(0,3);
     visible.forEach(e => {
       const evt = document.createElement('div');
@@ -1082,7 +1083,7 @@ function renderWeekView(){
     const dayEvents = events.filter(e =>
       e.year === d.getFullYear() && e.month === d.getMonth() && e.day === d.getDate() &&
       isVisibleOnTab(e, activeTab)
-    );
+    ).sort((a, b) => timeSortKey(a.time) - timeSortKey(b.time));
     const cards = dayEvents.map(e => {
       const range = eventTimeRange(e);
       const start = range.start != null ? range.start : 9;
@@ -1105,7 +1106,8 @@ function renderWeekView(){
 
 function renderPending(){
   const list = document.getElementById('pendingList');
-  const pending = events.filter(e => e.status === 'pending');
+  const pending = events.filter(e => e.status === 'pending')
+    .sort((a, b) => (a.year - b.year) || (a.month - b.month) || (a.day - b.day) || (timeSortKey(a.time) - timeSortKey(b.time)));
   if(pending.length === 0){
     list.innerHTML = '<div class="empty-note">Nothing waiting on approval.</div>';
     return;
