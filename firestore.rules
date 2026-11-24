@@ -9,10 +9,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isFamily() {
       return request.auth != null
-        && request.auth.uid in ['__UID_TOMO__', '__UID_VERON__'];
+        && request.auth.uid in ['o8ndZ0sAdXZBKPvk6Nfsqis7aC13', 'EQIhncSl2lOHq9AbBBzfQnOj7sx2'];
     }
     function isBackup() {
-      return request.auth != null && request.auth.uid == '__UID_BACKUP__';
+      return request.auth != null && request.auth.uid == '0sWTXa7lPZU61Cndm5ce9HF2Mtc2';
     }
 
     match /households/{householdId} {
