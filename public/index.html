@@ -577,16 +577,21 @@
   </div>
 </div>
 
-<!-- First-run identity picker -->
-<div class="overlay" id="whoOverlay" style="display:none;">
-  <div class="modal" style="text-align:center;">
-    <h3>Who's using this device?</h3>
-    <p style="color:var(--muted);font-size:13px;margin:10px 0 16px;line-height:1.4;">This sets who you're signed in as on this phone — you can still switch anytime with the tabs above.</p>
-    <div style="display:flex;gap:10px;">
-      <button onclick="pickIdentity('A')" style="flex:1;padding:14px;border:none;border-radius:10px;background:var(--tomo);color:#fff;font-weight:700;font-size:15px;cursor:pointer;">Tomo</button>
-      <button onclick="pickIdentity('B')" style="flex:1;padding:14px;border:none;border-radius:10px;background:var(--veron);color:#fff;font-weight:700;font-size:15px;cursor:pointer;">Veron</button>
+<!-- Sign-in (only Tomo's and Veron's accounts can open the calendar) -->
+<div class="overlay" id="signInOverlay" style="display:none;">
+  <form class="modal" onsubmit="signIn(event)">
+    <h3>Sign in</h3>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 6px;line-height:1.4;">Use your own email and password. You'll stay signed in on this phone.</p>
+    <label for="signInEmail">Email</label>
+    <input id="signInEmail" type="email" autocomplete="username" required>
+    <label for="signInPassword">Password</label>
+    <input id="signInPassword" type="password" autocomplete="current-password" required>
+    <div class="modal-hint" id="signInError" style="color:var(--rose);"></div>
+    <div class="modal-actions">
+      <button type="button" class="cancel" onclick="resetPassword()">Forgot password?</button>
+      <button type="submit" class="save" id="signInBtn">Sign in</button>
     </div>
-  </div>
+  </form>
 </div>
 
 <!-- Month picker modal -->
@@ -632,6 +637,29 @@
         <input id="evtEnd" type="time">
       </div>
     </div>
+    <div id="repeatFields">
+      <div class="row">
+        <div>
+          <label for="evtRepeat">Repeat</label>
+          <select id="evtRepeat" onchange="refreshRepeatFields()">
+            <option value="0">Does not repeat</option>
+            <option value="7">Every week</option>
+            <option value="14">Every 2 weeks</option>
+          </select>
+        </div>
+        <div id="repeatUntilWrap" style="display:none;">
+          <label for="evtRepeatUntil">Until</label>
+          <input id="evtRepeatUntil" type="date">
+        </div>
+      </div>
+    </div>
+    <div id="seriesScopeWrap" style="display:none;">
+      <label for="evtSeriesScope">This is a repeating event. Apply changes to</label>
+      <select id="evtSeriesScope">
+        <option value="one">This event only</option>
+        <option value="following">This and following events</option>
+      </select>
+    </div>
     <div class="modal-hint" id="modalDayLabel"></div>
     <div class="modal-actions">
       <div>
@@ -647,6 +675,7 @@
 <!-- ================= Firebase (fill in your project's config) ================= -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
   // PASTE your Firebase project config here (Firebase Console -> Project settings -> General -> Your apps -> SDK setup and configuration).
   const firebaseConfig = {
@@ -659,12 +688,21 @@
   };
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
+  const auth = firebase.auth();
   const stateDocRef = db.collection('households').doc('tomo-veron-family');
+
+  // Firebase Auth account IDs of the two people allowed in, mapped to the
+  // app's A/B identity. Must match the UIDs in firestore.rules. (UIDs, not
+  // emails, because this repo is public.)
+  const FAMILY_UIDS = {
+    '__UID_TOMO__': 'A',
+    '__UID_VERON__': 'B',
+  };
 </script>
 
 <script>
 /* ---------- State ---------- */
-let currentUser = localStorage.getItem('scal_myIdentity') || 'A'; // 'A' or 'B' — who is "acting" for approval purposes
+let currentUser = 'A'; // 'A' or 'B' — set from the signed-in account (see onAuthStateChanged)
 let activeTab = localStorage.getItem('scal_activeTab') || 'all'; // 'tomo' | 'veron' | 'all' — which calendar view is showing
 const userNames = { A: "Tomo", B: "Veron" };
 
@@ -705,56 +743,15 @@ let idCounter = 1;
 // handlers), but the old sequential counter collided when both phones added
 // something before syncing. Millisecond timestamp * 1000 + random keeps IDs
 // numeric, ordered, and effectively unique across devices.
+// Strictly increasing on this phone, so a repeating event can create many IDs
+// in the same millisecond without collisions.
+let lastIssuedId = 0;
 function nextId(){
   idCounter++; // kept only so older clients reading the doc don't choke
-  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+  lastIssuedId = Math.max(Date.now() * 1000 + Math.floor(Math.random() * 1000), lastIssuedId + 1);
+  return lastIssuedId;
 }
 
-/* ---------- Seed data from July.csv (used only the very first time the shared doc is created) ---------- */
-function seed(){
-  const raw = [
-    [1, "", "3:00 PM", "4:00 PM"],
-    [3, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
-    [4, "EP work", "7:00 AM", "3:00 PM"],
-    [5, "Trial class", "10:00 AM", "11:00 AM"],
-    [6, "Toshi's tennis", "4:00 PM", "6:00 PM"],
-    [7, "Tennis with Tanaka coach", "9:00 AM", "10:30 AM"],
-    [7, "Yuri-chan's pool", "3:00 PM", "4:00 PM"],
-    [8, "Toshi's pool", "3:00 PM", "4:00 PM"],
-    [10, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
-    [11, "EP work", "7:00 AM", "3:00 PM"],
-    [12, "Koinonia @ Miranda's", "6:00 PM", ""],
-    [13, "Toshi's tennis", "4:00 PM", "6:00 PM"],
-    [14, "Tennis with Tanaka coach", "9:00 AM", "10:30 AM"],
-    [14, "Yuri-chan's pool", "3:00 PM", "4:00 PM"],
-    [15, "Dentist", "10:15 AM", ""],
-    [15, "Toshi's pool", "3:00 PM", "4:00 PM"],
-    [17, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
-    [18, "EP work", "7:00 AM", "3:00 PM"],
-    [19, "Birthday party — Alicia's", "", ""],
-    [20, "Toshi's tennis", "4:00 PM", "6:00 PM"],
-    [21, "Tennis with Tanaka coach", "9:00 AM", "10:30 AM"],
-    [21, "Yuri-chan's pool", "3:00 PM", "4:00 PM"],
-    [22, "Toshi's pool", "3:00 PM", "4:00 PM"],
-    [24, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
-    [25, "EP work", "7:00 AM", "3:00 PM"],
-    [27, "Toshi's tennis", "4:00 PM", "6:00 PM"],
-    [28, "Tennis with Tanaka coach", "9:00 AM", "10:30 AM"],
-    [31, "Tennis with Takahashi coach", "3:00 PM", "4:30 PM"],
-  ];
-  raw.forEach(([day, title, start, end]) => {
-    events.push({
-      id: nextId(),
-      year: 2026,
-      month: 6, // July (0-indexed)
-      day,
-      title: title || "Busy",
-      time: formatRange(start, end),
-      status: 'confirmed',
-      createdBy: 'B'
-    });
-  });
-}
 function formatRange(start, end){
   if(start && end) return start + " – " + end;
   if(start) return start;
@@ -812,20 +809,43 @@ function nameSpan(key){
   return `<span style="color:${color};font-weight:700;">${userNames[key]}</span>`;
 }
 
-/* ---------- First-run identity picker ---------- */
-function pickIdentity(key){
-  currentUser = key;
-  localStorage.setItem('scal_myIdentity', key);
-  activeTab = key === 'A' ? 'tomo' : 'veron';
-  localStorage.setItem('scal_activeTab', activeTab);
-  document.getElementById('whoOverlay').style.display = 'none';
-  render();
+/* ---------- Sign-in ---------- */
+// Who you are comes from the account you signed in with, so it can't be
+// switched by accident and only the two family accounts can read or write.
+async function signIn(ev){
+  ev.preventDefault();
+  const btn = document.getElementById('signInBtn');
+  const errEl = document.getElementById('signInError');
+  errEl.textContent = '';
+  btn.disabled = true;
+  try {
+    await auth.signInWithEmailAndPassword(
+      document.getElementById('signInEmail').value.trim(),
+      document.getElementById('signInPassword').value
+    );
+    document.getElementById('signInPassword').value = '';
+  } catch(err){
+    errEl.textContent = (err.code === 'auth/network-request-failed')
+      ? 'No connection. Try again when you are online.'
+      : 'Wrong email or password.';
+  } finally {
+    btn.disabled = false;
+  }
 }
 
-// Reopens the identity picker so a device can be deliberately re-assigned
-// (e.g. it was set up as the wrong person) without clearing site data.
+async function resetPassword(){
+  const email = document.getElementById('signInEmail').value.trim();
+  const errEl = document.getElementById('signInError');
+  if(!email){ errEl.textContent = 'Type your email above first, then tap "Forgot password?".'; return; }
+  try {
+    await auth.sendPasswordResetEmail(email);
+  } catch(err){ /* don't reveal whether the email has an account */ }
+  errEl.textContent = 'If that email has an account, a reset link is on its way.';
+}
+
+// The "Signed in as … · sign out" link in the header.
 function openIdentitySwitcher(){
-  document.getElementById('whoOverlay').style.display = 'flex';
+  auth.signOut();
 }
 
 /* ---------- Tab switch ---------- */
@@ -833,15 +853,15 @@ function syncTabButtons(){
   document.getElementById('tabTomo').classList.toggle('active', activeTab==='tomo');
   document.getElementById('tabVeron').classList.toggle('active', activeTab==='veron');
   document.getElementById('tabAll').classList.toggle('active', activeTab==='all');
-  document.getElementById('whoamiLabel').textContent = 'Signed in as ' + userNames[currentUser] + ' · switch';
+  document.getElementById('whoamiLabel').textContent = 'Signed in as ' + userNames[currentUser] + ' · sign out';
 }
 // Switching tabs only changes which calendar you're LOOKING at — it must never
 // change who you're signed in as. Previously this also overwrote currentUser
 // (and persisted it to localStorage), so tapping the other parent's tab just to
 // peek at their schedule would silently flip your own identity: everything you
 // added afterward got attributed to them instead of you, and vanished from your
-// own tab. Identity is set once via the "Who's using this device?" picker
-// (pickIdentity) and stays put until deliberately changed.
+// own tab. Identity comes from the signed-in account and only changes by
+// signing out and in as the other person.
 function setTab(tab){
   activeTab = tab;
   localStorage.setItem('scal_activeTab', tab);
@@ -1113,12 +1133,19 @@ function renderPending(){
     return;
   }
   list.innerHTML = '';
+  const shownSeries = new Set();
   pending.forEach(e => {
+    // One row per repeating series (its first pending date), not one per date.
+    if(e.seriesId){
+      if(shownSeries.has(e.seriesId)) return;
+      shownSeries.add(e.seriesId);
+    }
+    const count = e.seriesId ? pending.filter(x => x.seriesId === e.seriesId).length : 1;
     const div = document.createElement('div');
     div.className = 'pending-item';
     div.innerHTML = `
       <strong>${escapeHtml(e.title)}</strong><br>
-      <div class="meta">${MONTH_NAMES[e.month]} ${e.day}, ${e.year}${e.time ? ' · ' + escapeHtml(e.time) : ''} · proposed by ${nameSpan(e.createdBy)}</div>
+      <div class="meta">${MONTH_NAMES[e.month]} ${e.day}, ${e.year}${e.time ? ' · ' + escapeHtml(e.time) : ''}${count > 1 ? ' · repeats (' + count + ' dates)' : ''} · proposed by ${nameSpan(e.createdBy)}</div>
       <div class="btnrow">
         <button class="btn-allow" onclick="approveEvent(${e.id})">Allow</button>
         <button class="btn-decline" onclick="declineEvent(${e.id})">Decline</button>
@@ -1424,14 +1451,20 @@ function escapeHtml(str){
 }
 
 /* ---------- Approval logic ---------- */
-function approveEvent(id){
+// A repeating event is approved or declined as a whole (all its pending dates).
+function pendingGroup(id){
   const e = events.find(x => x.id === id);
-  if(e) e.status = 'confirmed';
+  if(!e) return [];
+  return e.seriesId ? events.filter(x => x.seriesId === e.seriesId && x.status === 'pending') : [e];
+}
+function approveEvent(id){
+  pendingGroup(id).forEach(e => { e.status = 'confirmed'; });
   pushState();
   render();
 }
 function declineEvent(id){
-  events = events.filter(x => x.id !== id);
+  const doomed = new Set(pendingGroup(id).map(e => e.id));
+  events = events.filter(x => !doomed.has(x.id));
   pushState();
   render();
 }
@@ -1496,8 +1529,49 @@ function openAddModal(day){
   document.getElementById('evtEnd').value = '';
   document.getElementById('deleteBtn').style.display = 'none';
   document.getElementById('modalDayLabel').textContent = '';
+  // Repeat options only when adding; default "until" is 3 months out.
+  document.getElementById('repeatFields').style.display = '';
+  document.getElementById('seriesScopeWrap').style.display = 'none';
+  document.getElementById('evtRepeat').value = '0';
+  const untilInput = document.getElementById('evtRepeatUntil');
+  untilInput.min = isoOf(modalYear, modalMonth, day);
+  untilInput.max = isoOf(MAX_YEAR, MAX_MONTH, 31);
+  const defUntil = new Date(modalYear, modalMonth + 3, day);
+  const maxDate = new Date(MAX_YEAR, MAX_MONTH, 31);
+  untilInput.value = dateToIso(defUntil > maxDate ? maxDate : defUntil);
+  refreshRepeatFields();
   refreshApprovalHint();
   document.getElementById('overlay').classList.add('open');
+}
+
+/* ---------- Repeating events ----------
+   "Repeat every week until …" creates one ordinary event per date, all sharing
+   a seriesId. Everything else (month/week views, reminders, backups) keeps
+   working unchanged, and any single date can still be edited or deleted on its
+   own — or "this and following" can be changed together. */
+const MAX_OCCURRENCES = 120;
+function pad2(n){ return String(n).padStart(2, '0'); }
+function isoOf(y, m, d){ return y + '-' + pad2(m + 1) + '-' + pad2(d); }
+function dateToIso(dt){ return isoOf(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
+function eventIso(e){ return isoOf(e.year, e.month, e.day); }
+
+function refreshRepeatFields(){
+  const repeating = document.getElementById('evtRepeat').value !== '0';
+  document.getElementById('repeatUntilWrap').style.display = repeating ? '' : 'none';
+}
+
+function seriesEvents(e, scope){
+  if(!e.seriesId || scope === 'one') return [e];
+  const from = eventIso(e);
+  return events.filter(x => x.seriesId === e.seriesId && eventIso(x) >= from);
+}
+
+function repeatLabel(e){
+  if(!e.seriesId) return '';
+  const all = events.filter(x => x.seriesId === e.seriesId).sort((a, b) => eventIso(a).localeCompare(eventIso(b)));
+  const last = all[all.length - 1];
+  const every = e.repeatEveryDays === 14 ? 'every 2 weeks' : 'every week';
+  return `Repeats ${every} until ${MONTH_NAMES[last.month]} ${last.day}, ${last.year}.`;
 }
 
 function openEditModal(e){
@@ -1509,7 +1583,10 @@ function openEditModal(e){
   document.getElementById('evtStart').value = labelTo24Hour(start);
   document.getElementById('evtEnd').value = labelTo24Hour(end);
   document.getElementById('deleteBtn').style.display = 'inline-block';
-  document.getElementById('modalDayLabel').innerHTML = 'Originally added by ' + nameSpan(e.createdBy) + '.';
+  document.getElementById('modalDayLabel').innerHTML = 'Originally added by ' + nameSpan(e.createdBy) + '. ' + repeatLabel(e);
+  document.getElementById('repeatFields').style.display = 'none';
+  document.getElementById('seriesScopeWrap').style.display = e.seriesId ? '' : 'none';
+  document.getElementById('evtSeriesScope').value = 'one';
   refreshApprovalHint();
   document.getElementById('overlay').classList.add('open');
 }
@@ -1528,20 +1605,42 @@ function saveEvent(){
 
   if(editingEventId){
     const e = events.find(x => x.id === editingEventId);
-    e.title = title;
-    e.time = time;
-    e.status = status;
-    e.createdBy = currentUser;
+    const scope = document.getElementById('evtSeriesScope').value;
+    seriesEvents(e, scope).forEach(x => {
+      x.title = title;
+      x.time = time;
+      x.status = status;
+      x.createdBy = currentUser;
+    });
+    // Edited on its own, it no longer follows the series.
+    if(e.seriesId && scope === 'one'){ delete e.seriesId; delete e.repeatEveryDays; }
   } else {
-    events.push({
-      id: nextId(),
-      year: modalYear,
-      month: modalMonth,
-      day: modalDay,
-      title,
-      time,
-      status: status,
-      createdBy: currentUser
+    const everyDays = Number(document.getElementById('evtRepeat').value);
+    const first = new Date(modalYear, modalMonth, modalDay);
+    const dates = [first];
+    if(everyDays){
+      const untilStr = document.getElementById('evtRepeatUntil').value;
+      const maxDate = new Date(MAX_YEAR, MAX_MONTH, 31);
+      let until = untilStr ? new Date(untilStr + 'T00:00:00') : first;
+      if(until > maxDate) until = maxDate;
+      for(let d = addDaysDate(first, everyDays); d <= until && dates.length < MAX_OCCURRENCES; d = addDaysDate(d, everyDays)){
+        dates.push(d);
+      }
+    }
+    const seriesId = dates.length > 1 ? nextId() : null;
+    dates.forEach(d => {
+      const ev = {
+        id: nextId(),
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        day: d.getDate(),
+        title,
+        time,
+        status: status,
+        createdBy: currentUser
+      };
+      if(seriesId){ ev.seriesId = seriesId; ev.repeatEveryDays = everyDays; }
+      events.push(ev);
     });
     // jump the view to wherever the new event landed, in case it's a different month
     viewedYear = modalYear;
@@ -1553,7 +1652,9 @@ function saveEvent(){
 }
 
 function deleteEvent(){
-  events = events.filter(x => x.id !== editingEventId);
+  const e = events.find(x => x.id === editingEventId);
+  const doomed = new Set(e ? seriesEvents(e, document.getElementById('evtSeriesScope').value).map(x => x.id) : [editingEventId]);
+  events = events.filter(x => !doomed.has(x.id));
   pushState();
   closeModal();
   render();
@@ -1568,25 +1669,114 @@ let bannerTimer = null;
 // Firestore, which would overwrite everyone's data with nothing.
 let hasLoadedRemoteState = false;
 
-function currentStateBlob(){
-  return {
-    events, notes, shoppingItems, mealPlan, expenses, idCounter,
-    lastModifiedBy: currentUser,
-    lastModifiedAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
+/* ---------- Safe saving ----------
+   Saving used to write the whole calendar from this phone, so if both phones
+   edited around the same time the second save silently erased the first
+   person's change. Now each save works out only what changed on this phone
+   since the last server copy (serverBase), then — inside a transaction —
+   applies just those changes to the latest server data. Different edits on
+   the two phones are therefore merged instead of overwritten. Applying a
+   change set is idempotent (upsert/remove by id), so re-sending one is safe. */
+const LIST_FIELDS = ['events', 'notes', 'shoppingItems', 'expenses'];
+let serverBase = null;           // plain copy of the data as last received from the server
+let saveChain = Promise.resolve();
+
+function clone(x){ return JSON.parse(JSON.stringify(x)); }
+function localData(){ return clone({ events, notes, shoppingItems, mealPlan, expenses, idCounter }); }
+function dataFieldsOf(data){
+  return clone({
+    events: Array.isArray(data.events) ? data.events : [],
+    notes: Array.isArray(data.notes) ? data.notes : [],
+    shoppingItems: Array.isArray(data.shoppingItems) ? data.shoppingItems : [],
+    expenses: Array.isArray(data.expenses) ? data.expenses : [],
+    mealPlan: data.mealPlan || {},
+    idCounter: data.idCounter || 1,
+  });
+}
+
+function computeChanges(base, local){
+  const ch = { lists: {}, meal: [], idCounter: local.idCounter, empty: true };
+  LIST_FIELDS.forEach(f => {
+    const before = new Map((base[f] || []).map(x => [String(x.id), JSON.stringify(x)]));
+    const nowIds = new Set();
+    const upserts = [];
+    (local[f] || []).forEach(x => {
+      const id = String(x.id);
+      nowIds.add(id);
+      if(before.get(id) !== JSON.stringify(x)) upserts.push(x);
+    });
+    const removes = [...before.keys()].filter(id => !nowIds.has(id));
+    if(upserts.length || removes.length){
+      ch.lists[f] = { upserts, removes };
+      ch.empty = false;
+    }
+  });
+  const bm = base.mealPlan || {}, lm = local.mealPlan || {};
+  Object.keys(lm).forEach(group => {
+    Object.keys(lm[group] || {}).forEach(meal => {
+      if(((bm[group] || {})[meal] || '') !== (lm[group][meal] || '')){
+        ch.meal.push([group, meal, lm[group][meal]]);
+        ch.empty = false;
+      }
+    });
+  });
+  return ch;
+}
+
+function applyChanges(data, ch){
+  const out = dataFieldsOf(data);
+  Object.entries(ch.lists).forEach(([f, { upserts, removes }]) => {
+    const removeSet = new Set(removes);
+    const upsertMap = new Map(upserts.map(x => [String(x.id), x]));
+    const list = out[f].filter(x => !removeSet.has(String(x.id))).map(x => {
+      const id = String(x.id);
+      if(upsertMap.has(id)){ const u = upsertMap.get(id); upsertMap.delete(id); return u; }
+      return x;
+    });
+    upsertMap.forEach(x => list.push(x)); // newly added items
+    out[f] = list;
+  });
+  ch.meal.forEach(([group, meal, value]) => {
+    out.mealPlan[group] = out.mealPlan[group] || {};
+    out.mealPlan[group][meal] = value;
+  });
+  out.idCounter = Math.max(out.idCounter || 1, ch.idCounter || 1);
+  return out;
+}
+
+function setSaveStatus(msg){
+  const el = document.getElementById('connStatus');
+  el.textContent = msg || '';
+  el.classList.toggle('offline', !!msg);
 }
 
 function pushState(){
-  if(!hasLoadedRemoteState){
+  if(!hasLoadedRemoteState || !serverBase){
     console.warn('Blocked a save before initial sync finished loading, to avoid overwriting shared data.');
     return;
   }
-  stateDocRef.set(currentStateBlob(), { merge: true }).catch((err) => {
-    console.error('Sync failed:', err);
-    document.getElementById('connStatus').textContent = 'Could not save — check your connection.';
-    document.getElementById('connStatus').classList.add('offline');
+  const ch = computeChanges(serverBase, localData());
+  if(ch.empty) return;
+  saveChain = saveChain.then(() => db.runTransaction(async (tx) => {
+    const snap = await tx.get(stateDocRef);
+    const current = snap.exists ? snap.data() : {};
+    const merged = applyChanges(current, ch);
+    // Already on the server (e.g. a re-sent save) — don't write or notify again.
+    if(snap.exists && JSON.stringify(merged) === JSON.stringify(dataFieldsOf(current))) return;
+    tx.set(stateDocRef, Object.assign(merged, {
+      lastModifiedBy: currentUser,
+      lastModifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }), { merge: true });
+  })).then(() => {
+    setSaveStatus('');
+  }).catch((err) => {
+    console.error('Save failed:', err);
+    // The change stays on this phone and is re-sent when the connection is back.
+    setSaveStatus('Not saved yet — no connection. It will save automatically when you are back online.');
   });
 }
+
+window.addEventListener('online', () => { if(serverBase) pushState(); });
 
 function applyRemoteState(data){
   events = data.events || [];
@@ -1687,29 +1877,41 @@ async function refreshNotifButtonState(){
   } catch(err){ /* ignore */ }
 }
 
-function initSync(){
-  stateDocRef.onSnapshot((doc) => {
-    document.getElementById('connStatus').textContent = '';
-    document.getElementById('connStatus').classList.remove('offline');
+let unsubscribeSync = null;
 
+function initSync(){
+  if(unsubscribeSync) unsubscribeSync();
+  unsubscribeSync = stateDocRef.onSnapshot((doc) => {
     if(!doc.exists){
       // A cache-only snapshot (phone couldn't reach Firestore within ~10s) also
-      // reports exists=false even though the shared doc is there. Seeding then
-      // overwrote everyone's data with the July sample (happened 2026-11-19).
-      // Only the server can say the doc is really missing — wait for it.
+      // reports exists=false even though the shared doc is there. Treating that
+      // as "new calendar" wiped all data on 2026-11-19. Only the server can say
+      // the doc is really missing — wait for it.
       if(doc.metadata.fromCache) return;
-      // first ever run for this household: seed it and create the shared doc
-      seed();
+      // Genuinely brand-new household: start empty. The first edit creates the doc.
+      serverBase = dataFieldsOf({});
+      applyRemoteState({});
       hasLoadedRemoteState = true;
-      pushState();
       render();
       return;
     }
 
     const data = doc.data();
-    applyRemoteState(data);
+    // Keep any edits made on this phone that the server doesn't have yet
+    // (save still in flight, or made while offline): take them out, load the
+    // server copy, then put them back on top and save again.
+    const unsaved = serverBase ? computeChanges(serverBase, localData()) : null;
+    serverBase = dataFieldsOf(data);
+    if(unsaved && !unsaved.empty){
+      const merged = applyChanges(data, unsaved);
+      applyRemoteState(Object.assign({}, data, merged));
+    } else {
+      applyRemoteState(data);
+      if(!doc.metadata.fromCache) setSaveStatus('');
+    }
     hasLoadedRemoteState = true;
     render();
+    if(unsaved && !unsaved.empty && !doc.metadata.fromCache) pushState();
 
     const modifiedAtMs = (data.lastModifiedAt && data.lastModifiedAt.toMillis) ? data.lastModifiedAt.toMillis() : Date.now();
     latestModifiedAtMs = modifiedAtMs;
@@ -1719,24 +1921,51 @@ function initSync(){
     }
   }, (err) => {
     console.error('Sync listener error:', err);
-    document.getElementById('connStatus').textContent = 'Offline — showing your last synced data.';
-    document.getElementById('connStatus').classList.add('offline');
+    setSaveStatus(err.code === 'permission-denied'
+      ? 'This account does not have access to the calendar.'
+      : 'Offline — showing your last synced data.');
   });
+}
+
+function stopSync(){
+  if(unsubscribeSync){ unsubscribeSync(); unsubscribeSync = null; }
+  serverBase = null;
+  hasLoadedRemoteState = false;
+  applyRemoteState({});
 }
 
 /* ---------- Init ---------- */
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
-      .then(() => refreshNotifButtonState())
       .catch((err) => console.error('SW registration failed:', err));
   });
 }
-if(!localStorage.getItem('scal_myIdentity')){
-  document.getElementById('whoOverlay').style.display = 'flex';
-}
+
+// Nothing is loaded until someone signs in with one of the two family accounts.
+auth.onAuthStateChanged((user) => {
+  const overlay = document.getElementById('signInOverlay');
+  const who = user ? FAMILY_UIDS[user.uid] : null;
+  if(!user || !who){
+    stopSync();
+    if(user && !who){
+      document.getElementById('signInError').textContent = 'This account is not allowed to open the calendar.';
+      auth.signOut();
+    }
+    overlay.style.display = 'flex';
+    render();
+    return;
+  }
+  overlay.style.display = 'none';
+  currentUser = who;
+  if(!localStorage.getItem('scal_activeTab')){
+    activeTab = who === 'A' ? 'tomo' : 'veron';
+  }
+  render();
+  initSync();
+  refreshNotifButtonState();
+});
 render();
-initSync();
 </script>
 
 </body>

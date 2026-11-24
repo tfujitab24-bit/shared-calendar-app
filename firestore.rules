@@ -1,9 +1,26 @@
 rules_version = '2';
 
+// Only the two family accounts can read or change the calendar. The backup
+// account (used by the private GitHub backup job) can only read.
+// Cloud Functions use the Admin SDK and are not affected by these rules.
+// UIDs, not emails, because this repo is public. Keep in sync with
+// FAMILY_UIDS in public/index.html.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /households/{householdId} {
-      allow read, write: if true;
+    function isFamily() {
+      return request.auth != null
+        && request.auth.uid in ['__UID_TOMO__', '__UID_VERON__'];
     }
+    function isBackup() {
+      return request.auth != null && request.auth.uid == '__UID_BACKUP__';
+    }
+
+    match /households/{householdId} {
+      allow read: if isFamily() || isBackup();
+      allow write: if isFamily();
+    }
+
+    // Everything else (e.g. reminderState, written only by Cloud Functions)
+    // is closed to apps.
   }
 }
