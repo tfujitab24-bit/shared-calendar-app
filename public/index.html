@@ -140,18 +140,22 @@
   .today-card-wrap{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .today-card-wrap .card{ padding:16px 16px 12px; }
   @media (max-width:700px){ .today-card-wrap{ grid-template-columns:1fr; gap:12px; } }
+  .today-card-wrap .pending-card{ grid-column:1 / -1; border-color:var(--amber); }
+  .today-card-wrap .pending-card.hidden{ display:none; }
   .today-card-wrap h3{ font-size:15px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
   .today-card-wrap h3 .dot{ width:8px; height:8px; border-radius:50%; }
 
   .layout{
-    display:grid; grid-template-columns:1fr 320px; gap:24px;
+    display:grid; grid-template-columns:1fr; gap:24px;
     padding:24px 32px 48px; align-items:start;
   }
   @media (max-width:900px){ .layout{ grid-template-columns:1fr; } }
 
   .col-main{ display:flex; flex-direction:column; gap:24px; min-width:0; }
   .lists-row{ display:grid; grid-template-columns:1fr 1fr; gap:24px; }
-  .list-card{ padding:16px 16px 18px; }
+  .list-card{ padding:16px 16px 12px; }
+  .list-card h3{ font-size:15px; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .list-card h3 .dot{ width:8px; height:8px; border-radius:50%; }
   @media (max-width:700px){ .lists-row{ grid-template-columns:1fr; } }
 
   .card{
@@ -207,12 +211,14 @@
   .side h3 .dot{ width:8px; height:8px; border-radius:50%; }
 
   .pending-item{
-    background:var(--amber-soft); border-radius:8px; padding:9px 10px; margin-bottom:8px; font-size:13px;
+    background:var(--row); border-left:4px solid var(--amber); border-radius:8px;
+    padding:10px 12px; margin-bottom:8px; font-size:13.5px;
   }
+  .pending-item .meta{ margin:3px 0 0; }
   .pending-item .meta{ font-size:11px; color:var(--amber-ink); margin-bottom:6px; }
   .pending-item .btnrow{ display:flex; gap:6px; margin-top:7px; }
   .pending-item button{
-    border:none; border-radius:6px; padding:5px 10px; font-size:12px; font-weight:600; cursor:pointer;
+    border:none; border-radius:7px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; font-family:'Work Sans';
   }
   .btn-allow{ background:var(--teal); color:#fff; }
   .btn-decline{ background:transparent; color:var(--rose); border:1px solid var(--rose)!important; }
@@ -347,7 +353,7 @@
 
   /* ---- Mobile (iPhone) layout ---- */
   html, body{ overflow-x:hidden; }
-  @media (max-width:480px){
+  @media (max-width:700px){
     .topbar{ padding:12px 14px 10px; gap:10px; }
     .topbar > div:first-child{ flex:1; min-width:0; }
     .topbar h1{ font-size:20px; }
@@ -356,6 +362,8 @@
     .view-tabs{ order:2; width:100%; padding:4px; }
     .view-tabs button{ flex:1; padding:7px 6px; font-size:13px; }
     .notif-btn{ order:3; width:100%; height:34px; }
+  }
+  @media (max-width:480px){
 
     .today-card-wrap{ padding:10px 8px 0; }
     .layout{ padding:10px 8px 32px; gap:16px; }
@@ -426,6 +434,10 @@
     <h3><span class="dot" style="background:var(--amber)"></span>Tomorrow's Schedule</h3>
     <div id="tomorrowList"></div>
   </div>
+  <div class="card pending-card hidden" id="pendingCard">
+    <h3><span class="dot" style="background:var(--amber)"></span>Waiting for your OK</h3>
+    <div id="pendingList"></div>
+  </div>
 </div>
 
 <div class="layout">
@@ -495,27 +507,6 @@
     </div>
   </div>
 
-  <div class="side">
-
-    <div class="card">
-      <h3><span class="dot" style="background:var(--amber)"></span>Pending approval</h3>
-      <div id="pendingList"></div>
-    </div>
-
-    <div class="card">
-      <h3><span class="dot" style="background:var(--teal)"></span>Notes</h3>
-      <div id="notesList"></div>
-      <div class="sugg-input">
-        <input id="noteInput" type="text" placeholder="Add a note...">
-        <button onclick="addNote()">Add</button>
-      </div>
-      <div class="shop-completed-toggle" onclick="toggleCompletedNotes()">
-        <span id="notesToggleArrow">▾</span> Completed (<span id="notesCompletedCount">0</span>)
-      </div>
-      <div id="notesCompletedList" class="shop-completed-list hidden"></div>
-    </div>
-
-  </div>
 </div>
 
 </div><!-- /calendarPage -->
@@ -899,7 +890,6 @@ function render(){
     renderWeekView();
   }
   renderPending();
-  renderNotes();
   renderTodaySchedule();
   renderTomorrowSchedule();
   renderShopping();
@@ -1073,10 +1063,8 @@ function renderPending(){
   const list = document.getElementById('pendingList');
   const pending = events.filter(e => e.status === 'pending')
     .sort((a, b) => (a.year - b.year) || (a.month - b.month) || (a.day - b.day) || (timeSortKey(a.time) - timeSortKey(b.time)));
-  if(pending.length === 0){
-    list.innerHTML = '<div class="empty-note">Nothing waiting on approval.</div>';
-    return;
-  }
+  document.getElementById('pendingCard').classList.toggle('hidden', pending.length === 0);
+  if(pending.length === 0){ list.innerHTML = ''; return; }
   list.innerHTML = '';
   const shownSeries = new Set();
   pending.forEach(e => {
@@ -1089,7 +1077,7 @@ function renderPending(){
     const div = document.createElement('div');
     div.className = 'pending-item';
     div.innerHTML = `
-      <strong>${escapeHtml(e.title)}</strong><br>
+      <strong>${escapeHtml(e.title)}</strong>
       <div class="meta">${MONTH_NAMES[e.month]} ${e.day}, ${e.year}${e.time ? ' · ' + escapeHtml(e.time) : ''}${count > 1 ? ' · repeats (' + count + ' dates)' : ''} · proposed by ${nameSpan(e.createdBy)}</div>
       <div class="btnrow">
         <button class="btn-allow" onclick="approveEvent(${e.id})">Allow</button>
@@ -1098,64 +1086,6 @@ function renderPending(){
     `;
     list.appendChild(div);
   });
-}
-
-// Checking a note off marks it done and moves it into the collapsible
-// Completed section instead of deleting it — mirrors renderShoppingCategory
-// below, so a note can be unchecked (retrieved) or permanently deleted from there.
-function renderNotes(){
-  const active = notes.filter(n => !n.done);
-  const completed = notes.filter(n => n.done);
-
-  const list = document.getElementById('notesList');
-  list.innerHTML = active.length === 0 ? '<div class="empty-note">No notes yet.</div>' : '';
-  active.forEach(n => {
-    const row = document.createElement('label');
-    row.className = 'note-item';
-    row.innerHTML = `<input type="checkbox" onclick="toggleNote(${n.id})"><span>${escapeHtml(n.text)}</span>`;
-    list.appendChild(row);
-  });
-
-  document.getElementById('notesCompletedCount').textContent = completed.length;
-  const completedEl = document.getElementById('notesCompletedList');
-  completedEl.innerHTML = completed.length === 0 ? '<div class="empty-note">No completed notes.</div>' : '';
-  completed.forEach(n => {
-    const row = document.createElement('label');
-    row.className = 'note-item done';
-    row.innerHTML = `<input type="checkbox" checked onclick="toggleNote(${n.id})"><span>${escapeHtml(n.text)}</span>` +
-      `<button type="button" class="item-delete" title="Delete" onclick="event.preventDefault();event.stopPropagation();deleteNote(${n.id})">✕</button>`;
-    completedEl.appendChild(row);
-  });
-}
-
-function addNote(){
-  const input = document.getElementById('noteInput');
-  const text = input.value.trim();
-  if(!text) return;
-  notes.push({ id: nextId(), text, done: false });
-  input.value = '';
-  pushState();
-  render();
-}
-
-function toggleNote(id){
-  const n = notes.find(x => x.id === id);
-  if(!n) return;
-  n.done = !n.done;
-  pushState();
-  render();
-}
-
-function deleteNote(id){
-  notes = notes.filter(n => n.id !== id);
-  pushState();
-  render();
-}
-
-function toggleCompletedNotes(){
-  const list = document.getElementById('notesCompletedList');
-  const hidden = list.classList.toggle('hidden');
-  document.getElementById('notesToggleArrow').textContent = hidden ? '▾' : '▴';
 }
 
 /* ---------- Shopping: separate Wishlist and Grocery checklists ---------- */
